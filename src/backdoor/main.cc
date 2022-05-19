@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <poll.h>
 
+#include "./ssdp.h"
 #include "./util.h"
 #include "./upnp.h"
 #include "./net.h"
@@ -29,20 +30,20 @@ int main() {
 
     int upnpsock = socket(AF_INET, SOCK_DGRAM, PROTO_INET);
     
-//    char msg[strlen(msearch_template) + 1];
     upnp::send_msearch_m(upnpsock, {
         .max_wait = 1,
         .search_target = "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
     });
 
-//    sprintf(msg, msearch_template, 2);
-//    DPRINTF("=== upnp send message\n%s\n===\n", msg);
-//    sendto(upnpsock, msg, strlen(msg), 0, (sockaddr*)&upnpaddr, sizeof(upnpaddr));
-    
-    char resp[1024];
-    while (net::readto(upnpsock, resp, sizeof(resp), 100) > 0) {
-        DPRINTF("=== upnp recv message\n%s\n===\n", resp);
-        memset(resp, 0, sizeof(resp));
+    ssdp::ssdp_message message = ssdp::ssdp_message();
+    while (ssdp::recv_message(message, upnpsock, 100) >= 0) {
+        if (message.header.contains("ST") && message.header["ST"] == "urn:schemas-upnp-org:device:InternetGatewayDevice:1") {
+            for (const auto& [k, v] : message.header) {
+                DPRINTF("GOT FIELD \"%s:%s\"\n", k.c_str(), v.c_str());
+            }
+        }
+
+        message = ssdp::ssdp_message();
     }
 
     return 0;

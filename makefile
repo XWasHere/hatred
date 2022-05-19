@@ -1,10 +1,11 @@
 CXX=      g++
-CXX_ARGS= -ggdb -O3 -fpermissive -DDEBUG
+CXX_ARGS= -ggdb -O3 -fpermissive -DDEBUG --std=c++23
 
 BACKDOOR_OBJS = \
 	build/backdoor/main.o \
 	build/backdoor/net.o \
-	build/backdoor/upnp.o 
+	build/backdoor/upnp.o \
+	build/backdoor/ssdp.o
 
 .PHONY: all backdoor clean
 
@@ -30,3 +31,7 @@ build/backdoor/net.o: src/backdoor/net.cc src/backdoor/net.h src/backdoor/util.h
 build/backdoor/upnp.o: src/backdoor/upnp.cc src/backdoor/net.h src/backdoor/util.h src/backdoor/upnp.h
 	mkdir -p build/backdoor/
 	$(CXX) $(CXX_ARGS) -c src/backdoor/upnp.cc -o build/backdoor/upnp.o
+
+build/backdoor/ssdp.o: src/backdoor/ssdp.cc src/backdoor/net.h src/backdoor/ssdp.h
+	mkdir -p build/backdoor/
+	$(CXX) $(CXX_ARGS) -c src/backdoor/ssdp.cc -o build/backdoor/ssdp.o

@@ -11,6 +11,8 @@ namespace hatred::ssdp {
 
         std::map<std::string, std::string> header;
     };
+
+    int recv_message(ssdp_message& to, int socket, int timeout);
 };
 
 #endif
