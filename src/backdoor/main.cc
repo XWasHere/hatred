@@ -13,6 +13,7 @@
 #include "./util.h"
 #include "./upnp.h"
 #include "./net.h"
+#include "./http.h"
 
 #define IPV4_ADDR_STR_LEN 16
 
@@ -40,6 +41,25 @@ int main() {
         if (message.header.contains("ST") && message.header["ST"] == "urn:schemas-upnp-org:device:InternetGatewayDevice:1") {
             for (const auto& [k, v] : message.header) {
                 DPRINTF("GOT FIELD \"%s:%s\"\n", k.c_str(), v.c_str());
+            }
+
+            if (message.header.contains("LOCATION")) {
+                std::string loc = message.header["LOCATION"];
+
+                DPRINTF("REQUEST INFO FOR \"%s\"\n", loc.c_str());
+                
+                int httpsock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
+
+                if (http::send_message({
+                    .url = loc
+                }, httpsock, 100) > 0) {
+                    http::http_message msg;
+                    if (http::recv_message(msg, httpsock, 100) >= 0) {
+
+                    }
+                } else {
+                    DPRINTF("failed to get igd info");
+                }
             }
         }
 
