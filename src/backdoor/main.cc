@@ -48,11 +48,13 @@ int main() {
 
                 DPRINTF("REQUEST INFO FOR \"%s\"\n", loc.c_str());
                 
-                int httpsock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
+                int httpsock = socket(AF_INET, SOCK_STREAM, PROTO_INET); // XXX: @xwashere WHAT THE FUCK SOCK_STREAM DOESNT FIX FIX NOW FUCK YOUY
 
+                http::connect(httpsock, loc);
+                
                 if (http::send_message({
                     .url = loc
-                }, httpsock, 100) > 0) {
+                }, httpsock, 100) >= 0) {
                     http::http_message msg;
                     if (http::recv_message(msg, httpsock, 100) >= 0) {
 

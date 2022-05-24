@@ -18,10 +18,12 @@ namespace hatred::http {
         http_url    durl;
     };
 
-    int      send_message(const http_message& msg, int socket, int timeout);
-    int      recv_message(      http_message& to,  int socket, int timeout);
+    int send_message(const http_message& msg, int socket, int timeout);
+    int recv_message(      http_message& to,  int socket, int timeout);
     
     http_url parse_url(const std::string& url);
+    
+    int connect(int socket, const std::string& url);
 }
 
 #endif
