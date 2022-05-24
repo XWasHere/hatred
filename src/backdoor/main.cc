@@ -51,13 +51,18 @@ int main() {
                 int httpsock = socket(AF_INET, SOCK_STREAM, PROTO_INET); // XXX: @xwashere WHAT THE FUCK SOCK_STREAM DOESNT FIX FIX NOW FUCK YOUY
 
                 http::connect(httpsock, loc);
-                
+
                 if (http::send_message({
-                    .url = loc
+                    .url = loc,
+                    .header = { {"CPFN.UPNP.ORG", "asfdasfd"} }
                 }, httpsock, 100) >= 0) {
                     http::http_message msg;
                     if (http::recv_message(msg, httpsock, 100) >= 0) {
-
+                        DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
+                        for (const auto& [k, v] : msg.header) {
+                            DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
+                        }
+                        DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
                     }
                 } else {
                     DPRINTF("failed to get igd info");

@@ -31,23 +31,77 @@ namespace hatred::http {
 
     int send_message(const http_message& msg, int socket, int timeout) {
         http_url dest = parse_url(msg.url);
+        std::string message;
 
-        DPRINTF("REQUEST TO \"http://%s:%i/%s\"\n", dest.host.c_str(), dest.port, dest.path.c_str());
+        DPRINTF("request to \"http://%s:%i/%s\"\n", dest.host.c_str(), dest.port, dest.path.c_str());
 
-        char msgbuf[128];
+        message += msg.method + " /" + dest.path + " HTTP/1.1\r\n";
+        if (!msg.header.contains("Host")) message += "Host: " + dest.host + ":" + std::to_string(dest.port) + "\r\n";
+        if (!msg.header.contains("Content-Length")) message += "Content-Length: " + std::to_string(msg.body.length()) + "\r\n";
+        for (auto [k, v] : msg.header) message += k + ": " + v + "\r\n";
+        message += msg.body;
+        message += "\r\n";
 
-        send(socket, msgbuf, 127, 0);
+        DPRINTF("=== send http\n%s\n===\n", message.c_str());
+        send(socket, message.c_str(), message.length(), 0);
 
         return 0;
     }
 
     int recv_message(http_message& to, int socket, int timeout) {
-        char mbuf[128];
+        std::string message;
 
-        net::readto(socket, mbuf, 128, 100);
+        char mbuf[127];
+
+        while (net::readto(socket, mbuf, 126, 500)) {
+            message += mbuf;
+            memset(mbuf, 0, 126);
+        }
         
-        DPRINTF("=== recv http\n%s\n===\n", mbuf);
+        DPRINTF("=== recv http\n%s\n===\n", message.c_str());
         
+        int size = message.length();
+        int pos  = 0;
+
+        if (size < strlen("HTTP/1.1 ")) {
+            return -1;
+        }
+
+        if (message.substr(0, strlen("HTTP/1.1 ")) != "HTTP/1.1 ") {
+            return -1;
+        }
+
+        pos += strlen("HTTP/1.1 ");
+        
+        int start = pos;
+        while (message[pos++] != ' ');
+        std::from_chars(message.c_str() + start, message.c_str() + pos, to.status);
+
+        start = pos;
+        while (message[pos++] != '\r' || message[pos] != '\n');
+        to.status_reason = message.substr(start, pos - start);
+        pos++;
+        
+        while (message[pos] != '\r' || message[pos + 1] != '\n') {
+            std::string key;
+            std::string value;
+
+            for (start = pos; message[pos++] != ':';);
+            key = message.substr(start, pos - start - 1);
+
+            for (start = pos; message[pos] == ' '; pos++);
+
+            for (start = pos; message[pos++] != '\r' || message[pos] != '\n';);
+            value = message.substr(start, pos - start - 1);
+            pos++;
+
+            to.header[key] = value;
+        }
+
+        pos += 2;
+
+        to.body = message.substr(pos);
+
         return 0;
     }
 

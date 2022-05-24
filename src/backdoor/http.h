@@ -13,9 +13,17 @@ namespace hatred::http {
     };
 
     struct http_message {
-        std::string url;
+        std::string method = "GET";
 
+        std::string url;
         http_url    durl;
+
+        int status;
+        std::string status_reason;
+        
+        std::map<std::string, std::string> header;
+
+        std::string body;
     };
 
     int send_message(const http_message& msg, int socket, int timeout);
