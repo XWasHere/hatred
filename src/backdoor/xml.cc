@@ -171,12 +171,10 @@ PN(document) {
 }
 
 namespace hatred::xml {
-    xml_node* xml_parse(std::string& source) {
+    xml_node* parse_xml(std::string& source) {
         int pos = 0;
 
-        xml_node* node = new xml_node(P(document));
-
-        for (;pos < source.length(); pos++) printf("%c", source[pos]);
+        xml_node* node = new xml_node(P(document));\
         
         return node;
     }

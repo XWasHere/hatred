@@ -17,11 +17,9 @@ namespace hatred::xml {
         std::map<std::string, std::string> attributes;
 
         std::vector<xml_node> children;
-
-        xml_node* parent = 0;
     };
 
-    xml_node* xml_parse(std::string& source);
+    xml_node* parse_xml(std::string& source);
 }
 
 #endif

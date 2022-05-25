@@ -94,10 +94,69 @@ int main() {
                         }
                         DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
 
-                        xml::xml_node* node = xml::xml_parse(msg.body);
+                        xml::xml_node* node = xml::parse_xml(msg.body);
 
                         if (node) {
                             xml_print(node, 0);
+
+                            for (auto r1 : node->children) {
+                                if (r1.name == "URLBase") {
+                                    for (auto r2 : node->children) {
+                                        if (r2.name == "device") {
+                                            for (auto r3 : r2.children) {
+                                                if (r3.name == "deviceList") {
+                                                    for (auto r4 : r3.children) {
+                                                        if (r4.name == "device") {
+                                                            for (auto r5 : r4.children) {
+                                                                if (r5.name == "deviceList") {
+                                                                    for (auto r6 : r5.children) {
+                                                                        if (r6.name == "device") {
+                                                                            for (auto r7 : r6.children) {
+                                                                                if (r7.name == "serviceList") {
+                                                                                    for (auto r8 : r7.children) {
+                                                                                        if (r8.name == "service") {
+                                                                                            for (auto r9 : r8.children) {
+                                                                                                if (r9.name == "serviceType") {
+                                                                                                    if (r9.value == "urn:schemas-upnp-org:service:WANIPConnection:1") {
+                                                                                                        for (auto r10 : r8.children) {
+                                                                                                            if (r10.name == "controlURL") {
+                                                                                                                std::string control = r1.value + r10.value;
+                                                                                                                DPRINTF("control url: %s\n", control.c_str());
+
+                                                                                                                char sip[sizeof("XXX.XXX.XXX.XXX")];
+
+                                                                                                                sockaddr_in lip;
+                                                                                                                socklen_t   llen = sizeof(lip);
+
+                                                                                                                getsockname(httpsock, (sockaddr*)&lip, &llen);
+                                                                                                                inet_ntop(AF_INET, &lip.sin_addr, sip, sizeof(sip));
+
+                                                                                                                DPRINTF("local ip: %s\n", sip);
+
+                                                                                                                std::string local_ip = sip;
+
+                                                                                                                
+                                                                                                            }
+                                                                                                        }
+                                                                                                    }
+                                                                                                }
+                                                                                            }
+                                                                                        }
+                                                                                    }
+                                                                                }
+                                                                            }
+                                                                        }
+                                                                    }
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 } else {
