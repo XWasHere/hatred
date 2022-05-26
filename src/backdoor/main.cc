@@ -76,13 +76,13 @@ int main() {
     while (ssdp::recv_message(message, upnpsock, 100) >= 0) {
         if (message.header.contains("ST") && message.header["ST"] == "urn:schemas-upnp-org:device:InternetGatewayDevice:1") {
             for (const auto& [k, v] : message.header) {
-                DPRINTF("GOT FIELD \"%s:%s\"\n", k.c_str(), v.c_str());
+                //DPRINTF("GOT FIELD \"%s:%s\"\n", k.c_str(), v.c_str());
             }
 
             if (message.header.contains("LOCATION")) {
                 std::string loc = message.header["LOCATION"];
 
-                DPRINTF("REQUEST INFO FOR \"%s\"\n", loc.c_str());
+                DPRINTF("request info for \"%s\"\n", loc.c_str());
                 
                 int httpsock = socket(AF_INET, SOCK_STREAM, PROTO_INET); // XXX: @xwashere WHAT THE FUCK SOCK_STREAM DOESNT FIX FIX NOW FUCK YOUY
 
@@ -96,16 +96,16 @@ int main() {
                 }, httpsock, 100) >= 0) {
                     http::http_message msg;
                     if (http::recv_message(msg, httpsock, 500) >= 0) {
-                        DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
-                        for (const auto& [k, v] : msg.header) {
-                            DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
-                        }
-                        DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
+                        //DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
+                        //for (const auto& [k, v] : msg.header) {
+                        //    DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
+                        //}
+                        //DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
 
                         xml::xml_node* node = xml::parse_xml(msg.body);
 
                         if (node) {
-                            xml_print(node, 0);
+                            //xml_print(node, 0);
 
                             for (auto r1 : node->children) {
                                 if (r1.name == "URLBase") {
@@ -220,7 +220,6 @@ int main() {
                                                                                                                 
                                                                                                                 for (auto port : ports) {
                                                                                                                     if (i == 1) {
-                                                                                                                        printf("%i %i\n", i, port);
                                                                                                                         if (http::send_message({
                                                                                                                             .method = "POST",
                                                                                                                             .url = control,
@@ -233,19 +232,19 @@ int main() {
                                                                                                                             "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
                                                                                                                                 "<s:Body>"
                                                                                                                                     "<u:AddPortMapping u:act=\"urn:schemas-upnp-org:service:WANIPConnection:1\">"
-                                                                                                                                        
+                                                                                                                                        "<NewRemoteHost></NewRemoteHost>"
+                                                                                                                                        "<NewExternalPort>" + std::to_string(port) + "</NewExternalPort>"
+                                                                                                                                        "<NewProtocol>TCP</NewProtocol>"
+                                                                                                                                        "<NewInternalPort>42069</NewInternalPort>"
+                                                                                                                                        "<NewInternalClient>" + local_ip + "</NewInternalClient>"
+                                                                                                                                        "<NewEnabled>1</NewEnabled>"
+                                                                                                                                        "<NewPortMappingDescription></NewPortMappingDescription>"
+                                                                                                                                        "<NewLeaseDuration>0</NewLeaseDuration>"
                                                                                                                                     "</u:AddPortMapping>"
                                                                                                                                 "</s:Body>"
                                                                                                                             "</s:Envelope>\r\n"
                                                                                                                         }, httpsock, 100) >= 0) {
-                                                                                                                            http::http_message msg;
-                                                                                                                            if (http::recv_message(msg, httpsock, 100) >= 0) {
-                                                                                                                                DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
-                                                                                                                                for (const auto& [k, v] : msg.header) {
-                                                                                                                                    DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
-                                                                                                                                }
-                                                                                                                                DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
-                                                                                                                            }
+                                                                                                                            DPRINTF("forwarded *.*.*.*:%i -> %s:42069\n", port, local_ip.c_str());
                                                                                                                         }
                                                                                                                         break;
                                                                                                                     } else i--;
