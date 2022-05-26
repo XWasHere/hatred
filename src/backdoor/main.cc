@@ -1,5 +1,9 @@
 // for educational purposes only
 
+#include <charconv>
+#include <list>
+#include <random>
+
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -15,6 +19,8 @@
 #include "./net.h"
 #include "./http.h"
 #include "./xml.h"
+
+#define MAX_PORT 65535
 
 #define IPV4_ADDR_STR_LEN 16
 
@@ -84,10 +90,12 @@ int main() {
 
                 if (http::send_message({
                     .url = loc,
-                    .header = { {"CPFN.UPNP.ORG", "asfdasfd"} }
+                    .header = { 
+                        {"CPFN.UPNP.ORG", "asfdasfd"}
+                    }
                 }, httpsock, 100) >= 0) {
                     http::http_message msg;
-                    if (http::recv_message(msg, httpsock, 100) >= 0) {
+                    if (http::recv_message(msg, httpsock, 500) >= 0) {
                         DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
                         for (const auto& [k, v] : msg.header) {
                             DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
@@ -135,7 +143,113 @@ int main() {
 
                                                                                                                 std::string local_ip = sip;
 
+                                                                                                                http::http_url nurl = http::parse_url(control);
+                                                                                                                http::http_url ourl = http::parse_url(loc);
+
+                                                                                                                if (!(nurl.host == ourl.host && nurl.port == ourl.port)) {
+                                                                                                                    close(httpsock);
+                                                                                                                    httpsock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
+                                                                                                                    http::connect(httpsock, control);
+                                                                                                                }
+
+                                                                                                                std::list<unsigned short> ports;
+                                                                                                                int                       pcount = MAX_PORT;
+
+                                                                                                                for (int i = 0; i < MAX_PORT; i++) {
+                                                                                                                    ports.push_back(i + 1);
+                                                                                                                }
+
+                                                                                                                for (int i = 0; i < MAX_PORT; i++) {
+                                                                                                                    if (http::send_message({
+                                                                                                                        .method = "POST",
+                                                                                                                        .url = control,
+                                                                                                                        .header = {
+                                                                                                                            {"CONTENT-TYPE",  "text/xml"},
+                                                                                                                            {"SOAPACTION",    "\"urn:schemas-upnp-org:service:WANIPConnection:1#GetGenericPortMappingEntry\""},
+                                                                                                                        },
+                                                                                                                        .body = 
+                                                                                                                        "<?xml version=\"1.0\"?>\r\n"
+                                                                                                                        "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+                                                                                                                            "<s:Body>"
+                                                                                                                                "<u:GetGenericPortMappingEntry u:act=\"urn:schemas-upnp-org:service:WANIPConnection:1\">"
+                                                                                                                                    "<NewPortMappingIndex>" + std::to_string(i) + "</NewPortMappingIndex>"
+                                                                                                                                "</u:GetGenericPortMappingEntry>"
+                                                                                                                            "</s:Body>"
+                                                                                                                        "</s:Envelope>\r\n"
+                                                                                                                    }, httpsock, 100) >= 0) {
+                                                                                                                        http::http_message msg;
+                                                                                                                        if (http::recv_message(msg, httpsock, 100) >= 0) {
+                                                                                                                            //DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
+                                                                                                                            //for (const auto& [k, v] : msg.header) {
+                                                                                                                            //    DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
+                                                                                                                            //}
+                                                                                                                            //DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
+
+                                                                                                                            if (msg.status == 500) break;
+
+                                                                                                                            xml::xml_node* resp = xml::parse_xml(msg.body);
+                                                                                                                            
+                                                                                                                            for (auto nd : resp->children[0].children[0].children) {
+                                                                                                                                if (nd.name == "NewProtocol") {
+                                                                                                                                    if (nd.value == "TCP") {     
+                                                                                                                                        for (auto nd : resp->children[0].children[0].children) {
+                                                                                                                                            if (nd.name == "NewExternalPort") {
+                                                                                                                                                int p;
+                                                                                                                                                
+                                                                                                                                                std::from_chars(nd.value.c_str(), nd.value.c_str() + nd.value.length(), p);
+
+                                                                                                                                                DPRINTF("port %i is already in use\n", p);
+
+                                                                                                                                                ports.remove(p);
+                                                                                                                                                pcount--;
+                                                                                                                                            }
+                                                                                                                                        }
+                                                                                                                                    }
+                                                                                                                                }
+                                                                                                                            }
+                                                                                                                        }
+                                                                                                                    }
+                                                                                                                }
+
+                                                                                                                std::random_device            rdev;
+                                                                                                                std::mt19937                  ralg(rdev());
+                                                                                                                std::uniform_int_distribution rprt(1, pcount);
+
+
+                                                                                                                int i = rprt(ralg);
                                                                                                                 
+                                                                                                                for (auto port : ports) {
+                                                                                                                    if (i == 1) {
+                                                                                                                        printf("%i %i\n", i, port);
+                                                                                                                        if (http::send_message({
+                                                                                                                            .method = "POST",
+                                                                                                                            .url = control,
+                                                                                                                            .header = {
+                                                                                                                                {"CONTENT-TYPE",  "text/xml"},
+                                                                                                                                {"SOAPACTION",    "\"urn:schemas-upnp-org:service:WANIPConnection:1#AddPortMapping\""},
+                                                                                                                            },
+                                                                                                                            .body = 
+                                                                                                                            "<?xml version=\"1.0\"?>\r\n"
+                                                                                                                            "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+                                                                                                                                "<s:Body>"
+                                                                                                                                    "<u:AddPortMapping u:act=\"urn:schemas-upnp-org:service:WANIPConnection:1\">"
+                                                                                                                                        
+                                                                                                                                    "</u:AddPortMapping>"
+                                                                                                                                "</s:Body>"
+                                                                                                                            "</s:Envelope>\r\n"
+                                                                                                                        }, httpsock, 100) >= 0) {
+                                                                                                                            http::http_message msg;
+                                                                                                                            if (http::recv_message(msg, httpsock, 100) >= 0) {
+                                                                                                                                DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
+                                                                                                                                for (const auto& [k, v] : msg.header) {
+                                                                                                                                    DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
+                                                                                                                                }
+                                                                                                                                DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
+                                                                                                                            }
+                                                                                                                        }
+                                                                                                                        break;
+                                                                                                                    } else i--;
+                                                                                                                };
                                                                                                             }
                                                                                                         }
                                                                                                     }

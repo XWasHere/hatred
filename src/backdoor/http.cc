@@ -39,8 +39,8 @@ namespace hatred::http {
         if (!msg.header.contains("Host")) message += "Host: " + dest.host + ":" + std::to_string(dest.port) + "\r\n";
         if (!msg.header.contains("Content-Length")) message += "Content-Length: " + std::to_string(msg.body.length()) + "\r\n";
         for (auto [k, v] : msg.header) message += k + ": " + v + "\r\n";
-        message += msg.body;
         message += "\r\n";
+        message += msg.body;
 
         DPRINTF("=== send http\n%s\n===\n", message.c_str());
         send(socket, message.c_str(), message.length(), 0);
@@ -53,7 +53,7 @@ namespace hatred::http {
 
         char mbuf[127];
 
-        while (net::readto(socket, mbuf, 126, 500)) {
+        while (net::readto(socket, mbuf, 126, timeout)) {
             message += mbuf;
             memset(mbuf, 0, 126);
         }

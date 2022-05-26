@@ -89,10 +89,11 @@ PN(element) {
             pos++;
             bg = pos;
             bc = 0;
-            while (pos < source.length() && !(P(s) || source[pos] == '/' || source[pos] == '>')) {
+            while (pos < source.length() && !(P(s) || source[pos] == '"' || source[pos] == '\"')) {
                 pos++;
                 bc++;
             }
+            pos++;
             value = source.substr(bg, bc - 1);
 
             nd.attributes[name] = value;
