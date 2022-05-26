@@ -28,33 +28,33 @@
 
 using namespace hatred;
 
-void xml_print(xml::xml_node* node, int depth) {
-    printf("%*s<%s%s", depth, "", node->pi ? "?" : "", node->name.c_str());
+void xml_print(xml::xml_node& node, int depth) {
+    printf("%*s<%s%s", depth, "", node.pi ? "?" : "", node.name.c_str());
     
-    for (auto [k, v] : node->attributes) printf(" %s=\"%s\"", k.c_str(), v.c_str());
+    for (auto [k, v] : node.attributes) printf(" %s=\"%s\"", k.c_str(), v.c_str());
     
-    if (node->pi) {
+    if (node.pi) {
         printf("?>\n");
         return;
     }
 
-    if (node->leaf) {
-        printf(">%s</%s>\n", node->value.c_str(), node->name.c_str());
+    if (node.leaf) {
+        printf(">%s</%s>\n", node.value.c_str(), node.name.c_str());
         return;
     }
 
-    if (node->children.size() == 0) {
+    if (node.children.size() == 0) {
         printf("/>\n");
         return;
     } 
 
     printf(">\n");
 
-    for (auto i : node->children) {
-        xml_print(&i, depth + 1);
+    for (auto i : node.children) {
+        xml_print(i, depth + 1);
     }
 
-    printf("%*s</%s>\n", depth, "", node->name.c_str());
+    printf("%*s</%s>\n", depth, "", node.name.c_str());
 }
 
 int main() {
@@ -102,167 +102,161 @@ int main() {
                         //}
                         //DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
 
-                        xml::xml_node* node = xml::parse_xml(msg.body);
+                        if (xml::xml_node node = xml::parse_xml(msg.body)) {
+                            if (xml::xml_node base = node["URLBase"]) {
+                                for (auto wandev : node["device"]["deviceList"]) {
+                                    if (wandev["deviceType"] == "urn:schemas-upnp-org:device:WANDevice:1") {
+                                        for (auto condev : wandev["deviceList"]) {
+                                            if (condev["deviceType"] == "urn:schemas-upnp-org:device:WANConnectionDevice:1") {
+                                                for (auto wansvc : condev["serviceList"]) {
+                                                    if (wansvc["serviceType"] == "urn:schemas-upnp-org:service:WANIPConnection:1") {
+                                                        std::string control = base.value + wansvc["controlURL"].value;
+                                                        DPRINTF("control url: %s\n", control.c_str());
 
-                        if (node) {
-                            //xml_print(node, 0);
+                                                        char sip[sizeof("XXX.XXX.XXX.XXX")];
 
-                            for (auto r1 : node->children) {
-                                if (r1.name == "URLBase") {
-                                    for (auto r2 : node->children) {
-                                        if (r2.name == "device") {
-                                            for (auto r3 : r2.children) {
-                                                if (r3.name == "deviceList") {
-                                                    for (auto r4 : r3.children) {
-                                                        if (r4.name == "device") {
-                                                            for (auto r5 : r4.children) {
-                                                                if (r5.name == "deviceList") {
-                                                                    for (auto r6 : r5.children) {
-                                                                        if (r6.name == "device") {
-                                                                            for (auto r7 : r6.children) {
-                                                                                if (r7.name == "serviceList") {
-                                                                                    for (auto r8 : r7.children) {
-                                                                                        if (r8.name == "service") {
-                                                                                            for (auto r9 : r8.children) {
-                                                                                                if (r9.name == "serviceType") {
-                                                                                                    if (r9.value == "urn:schemas-upnp-org:service:WANIPConnection:1") {
-                                                                                                        for (auto r10 : r8.children) {
-                                                                                                            if (r10.name == "controlURL") {
-                                                                                                                std::string control = r1.value + r10.value;
-                                                                                                                DPRINTF("control url: %s\n", control.c_str());
+                                                        sockaddr_in lip;
+                                                        socklen_t   llen = sizeof(lip);
 
-                                                                                                                char sip[sizeof("XXX.XXX.XXX.XXX")];
+                                                        getsockname(httpsock, (sockaddr*)&lip, &llen);
+                                                        inet_ntop(AF_INET, &lip.sin_addr, sip, sizeof(sip));
 
-                                                                                                                sockaddr_in lip;
-                                                                                                                socklen_t   llen = sizeof(lip);
+                                                        DPRINTF("local ip: %s\n", sip);
 
-                                                                                                                getsockname(httpsock, (sockaddr*)&lip, &llen);
-                                                                                                                inet_ntop(AF_INET, &lip.sin_addr, sip, sizeof(sip));
+                                                        std::string local_ip = sip;
 
-                                                                                                                DPRINTF("local ip: %s\n", sip);
+                                                        http::http_url nurl = http::parse_url(control);
+                                                        http::http_url ourl = http::parse_url(loc);
 
-                                                                                                                std::string local_ip = sip;
+                                                        if (!(nurl.host == ourl.host && nurl.port == ourl.port)) {
+                                                            close(httpsock);
+                                                            httpsock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
+                                                            http::connect(httpsock, control);
+                                                        }
 
-                                                                                                                http::http_url nurl = http::parse_url(control);
-                                                                                                                http::http_url ourl = http::parse_url(loc);
+                                                        std::list<unsigned short> ports;
+                                                        int                       pcount = MAX_PORT;
 
-                                                                                                                if (!(nurl.host == ourl.host && nurl.port == ourl.port)) {
-                                                                                                                    close(httpsock);
-                                                                                                                    httpsock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
-                                                                                                                    http::connect(httpsock, control);
-                                                                                                                }
+                                                        for (int i = 0; i < MAX_PORT; i++) {
+                                                            ports.push_back(i + 1);
+                                                        }
 
-                                                                                                                std::list<unsigned short> ports;
-                                                                                                                int                       pcount = MAX_PORT;
+                                                        for (int i = 0; i < MAX_PORT; i++) {
+                                                            if (http::send_message({
+                                                                .method = "POST",
+                                                                .url = control,
+                                                                .header = {
+                                                                    {"CONTENT-TYPE",  "text/xml"},
+                                                                    {"SOAPACTION",    "\"urn:schemas-upnp-org:service:WANIPConnection:1#GetGenericPortMappingEntry\""},
+                                                                },
+                                                                .body = 
+                                                                "<?xml version=\"1.0\"?>\r\n"
+                                                                "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+                                                                    "<s:Body>"
+                                                                        "<u:GetGenericPortMappingEntry u:act=\"urn:schemas-upnp-org:service:WANIPConnection:1\">"
+                                                                            "<NewPortMappingIndex>" + std::to_string(i) + "</NewPortMappingIndex>"
+                                                                        "</u:GetGenericPortMappingEntry>"
+                                                                    "</s:Body>"
+                                                                "</s:Envelope>\r\n"
+                                                            }, httpsock, 100) >= 0) {
+                                                                http::http_message msg;
+                                                                if (http::recv_message(msg, httpsock, 1000) >= 0) {
+                                                                    //DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
+                                                                    //for (const auto& [k, v] : msg.header) {
+                                                                    //    DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
+                                                                    //}
+                                                                    //DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
 
-                                                                                                                for (int i = 0; i < MAX_PORT; i++) {
-                                                                                                                    ports.push_back(i + 1);
-                                                                                                                }
+                                                                    if (msg.status == 500) break;
 
-                                                                                                                for (int i = 0; i < MAX_PORT; i++) {
-                                                                                                                    if (http::send_message({
-                                                                                                                        .method = "POST",
-                                                                                                                        .url = control,
-                                                                                                                        .header = {
-                                                                                                                            {"CONTENT-TYPE",  "text/xml"},
-                                                                                                                            {"SOAPACTION",    "\"urn:schemas-upnp-org:service:WANIPConnection:1#GetGenericPortMappingEntry\""},
-                                                                                                                        },
-                                                                                                                        .body = 
-                                                                                                                        "<?xml version=\"1.0\"?>\r\n"
-                                                                                                                        "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
-                                                                                                                            "<s:Body>"
-                                                                                                                                "<u:GetGenericPortMappingEntry u:act=\"urn:schemas-upnp-org:service:WANIPConnection:1\">"
-                                                                                                                                    "<NewPortMappingIndex>" + std::to_string(i) + "</NewPortMappingIndex>"
-                                                                                                                                "</u:GetGenericPortMappingEntry>"
-                                                                                                                            "</s:Body>"
-                                                                                                                        "</s:Envelope>\r\n"
-                                                                                                                    }, httpsock, 100) >= 0) {
-                                                                                                                        http::http_message msg;
-                                                                                                                        if (http::recv_message(msg, httpsock, 100) >= 0) {
-                                                                                                                            //DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
-                                                                                                                            //for (const auto& [k, v] : msg.header) {
-                                                                                                                            //    DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
-                                                                                                                            //}
-                                                                                                                            //DPRINTF("=== body\n%s\n===\n", msg.body.c_str());
+                                                                    xml::xml_node resp = xml::parse_xml(msg.body);
 
-                                                                                                                            if (msg.status == 500) break;
+                                                                    if (resp[0][0]["NewProtocol"] == "TCP") {
+                                                                        if (   resp[0][0]["NewInternalClient"] == local_ip 
+                                                                            && resp[0][0]["NewInternalPort"] == "42069"
+                                                                            && resp[0][0]["NewPortMappingDescription"] == "") {
+                                                                            DPRINTF("cleaning up %s\n", resp[0][0]["NewExternalPort"].value.c_str());
 
-                                                                                                                            xml::xml_node* resp = xml::parse_xml(msg.body);
-                                                                                                                            
-                                                                                                                            for (auto nd : resp->children[0].children[0].children) {
-                                                                                                                                if (nd.name == "NewProtocol") {
-                                                                                                                                    if (nd.value == "TCP") {     
-                                                                                                                                        for (auto nd : resp->children[0].children[0].children) {
-                                                                                                                                            if (nd.name == "NewExternalPort") {
-                                                                                                                                                int p;
-                                                                                                                                                
-                                                                                                                                                std::from_chars(nd.value.c_str(), nd.value.c_str() + nd.value.length(), p);
+                                                                            http::send_message({
+                                                                                .method = "POST",
+                                                                                .url = control,
+                                                                                .header = {
+                                                                                    {"CONTENT-TYPE", "text/xml"},
+                                                                                    {"SOAPACTION",   "\"urn:schemas-upnp-org:service:WANIPConnection:1#DeletePortMapping\""}
+                                                                                },
+                                                                                .body = 
+                                                                                "<?xml version=\"1.0\"?>\r\n"
+                                                                                "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+                                                                                    "<s:Body>"
+                                                                                        "<u:DeletePortMapping u:act=\"urn:schemas-upnp-org:service:WANIPConnection:1\">"
+                                                                                            "<NewRemoteHost></NewRemoteHost>"
+                                                                                            "<NewExternalPort>" + resp[0][0]["NewExternalPort"].value + "</NewExternalPort>"
+                                                                                            "<NewProtocol>TCP</NewProtocol>"
+                                                                                        "</u:DeletePortMapping>"
+                                                                                    "</s:Body>"
+                                                                                "</s:Envelope>\r\n"
+                                                                            }, httpsock, 100);
 
-                                                                                                                                                DPRINTF("port %i is already in use\n", p);
+                                                                            http::http_message msg;
+                                                                            http::recv_message(msg, httpsock, 5000);
 
-                                                                                                                                                ports.remove(p);
-                                                                                                                                                pcount--;
-                                                                                                                                            }
-                                                                                                                                        }
-                                                                                                                                    }
-                                                                                                                                }
-                                                                                                                            }
-                                                                                                                        }
-                                                                                                                    }
-                                                                                                                }
+                                                                            i--;
+                                                                        } else if (xml::xml_node& port_node = resp[0][0]["NewExternalPort"]) {
+                                                                            int p;
+                                                                            
+                                                                            std::from_chars(port_node.value.c_str(), port_node.value.c_str() + port_node.value.length(), p);
 
-                                                                                                                std::random_device            rdev;
-                                                                                                                std::mt19937                  ralg(rdev());
-                                                                                                                std::uniform_int_distribution rprt(1, pcount);
+                                                                            DPRINTF("port %i is already in use\n", p);
 
-
-                                                                                                                int i = rprt(ralg);
-                                                                                                                
-                                                                                                                for (auto port : ports) {
-                                                                                                                    if (i == 1) {
-                                                                                                                        if (http::send_message({
-                                                                                                                            .method = "POST",
-                                                                                                                            .url = control,
-                                                                                                                            .header = {
-                                                                                                                                {"CONTENT-TYPE",  "text/xml"},
-                                                                                                                                {"SOAPACTION",    "\"urn:schemas-upnp-org:service:WANIPConnection:1#AddPortMapping\""},
-                                                                                                                            },
-                                                                                                                            .body = 
-                                                                                                                            "<?xml version=\"1.0\"?>\r\n"
-                                                                                                                            "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
-                                                                                                                                "<s:Body>"
-                                                                                                                                    "<u:AddPortMapping u:act=\"urn:schemas-upnp-org:service:WANIPConnection:1\">"
-                                                                                                                                        "<NewRemoteHost></NewRemoteHost>"
-                                                                                                                                        "<NewExternalPort>" + std::to_string(port) + "</NewExternalPort>"
-                                                                                                                                        "<NewProtocol>TCP</NewProtocol>"
-                                                                                                                                        "<NewInternalPort>42069</NewInternalPort>"
-                                                                                                                                        "<NewInternalClient>" + local_ip + "</NewInternalClient>"
-                                                                                                                                        "<NewEnabled>1</NewEnabled>"
-                                                                                                                                        "<NewPortMappingDescription></NewPortMappingDescription>"
-                                                                                                                                        "<NewLeaseDuration>0</NewLeaseDuration>"
-                                                                                                                                    "</u:AddPortMapping>"
-                                                                                                                                "</s:Body>"
-                                                                                                                            "</s:Envelope>\r\n"
-                                                                                                                        }, httpsock, 100) >= 0) {
-                                                                                                                            DPRINTF("forwarded *.*.*.*:%i -> %s:42069\n", port, local_ip.c_str());
-                                                                                                                        }
-                                                                                                                        break;
-                                                                                                                    } else i--;
-                                                                                                                };
-                                                                                                            }
-                                                                                                        }
-                                                                                                    }
-                                                                                                }
-                                                                                            }
-                                                                                        }
-                                                                                    }
-                                                                                }
-                                                                            }
+                                                                            ports.remove(p);
+                                                                            pcount--;
                                                                         }
                                                                     }
                                                                 }
                                                             }
                                                         }
+
+                                                        std::random_device            rdev;
+                                                        std::mt19937                  ralg(rdev());
+                                                        std::uniform_int_distribution rprt(1, pcount);
+
+
+                                                        int i = rprt(ralg);
+                                                        
+                                                        for (auto port : ports) {
+                                                            if (i == 1) {
+                                                                if (http::send_message({
+                                                                    .method = "POST",
+                                                                    .url = control,
+                                                                    .header = {
+                                                                        {"CONTENT-TYPE",  "text/xml"},
+                                                                        {"SOAPACTION",    "\"urn:schemas-upnp-org:service:WANIPConnection:1#AddPortMapping\""},
+                                                                    },
+                                                                    .body = 
+                                                                    "<?xml version=\"1.0\"?>\r\n"
+                                                                    "<s:Envelope xmlns:s=\"http://schemas.xmlsoap.org/soap/envelope/\" s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
+                                                                        "<s:Body>"
+                                                                            "<u:AddPortMapping u:act=\"urn:schemas-upnp-org:service:WANIPConnection:1\">"
+                                                                                "<NewRemoteHost></NewRemoteHost>"
+                                                                                "<NewExternalPort>" + std::to_string(port) + "</NewExternalPort>"
+                                                                                "<NewProtocol>TCP</NewProtocol>"
+                                                                                "<NewInternalPort>42069</NewInternalPort>"
+                                                                                "<NewInternalClient>" + local_ip + "</NewInternalClient>"
+                                                                                "<NewEnabled>1</NewEnabled>"
+                                                                                "<NewPortMappingDescription></NewPortMappingDescription>"
+                                                                                "<NewLeaseDuration>0</NewLeaseDuration>"
+                                                                            "</u:AddPortMapping>"
+                                                                        "</s:Body>"
+                                                                    "</s:Envelope>\r\n"
+                                                                }, httpsock, 100) >= 0) {
+                                                                    http::http_message msg;
+                                                                    http::recv_message(msg, httpsock, 5000);
+
+                                                                    DPRINTF("forwarded *.*.*.*:%i -> %s:42069\n", port, local_ip.c_str());
+                                                                }
+                                                                break;
+                                                            } else i--;
+                                                        };
                                                     }
                                                 }
                                             }

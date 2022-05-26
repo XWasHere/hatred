@@ -171,12 +171,69 @@ PN(document) {
     return root;
 }
 
+static hatred::xml::xml_node null_node { .exists = 0 };
+
 namespace hatred::xml {
-    xml_node* parse_xml(std::string& source) {
+    xml_node parse_xml(std::string& source) {
         int pos = 0;
 
-        xml_node* node = new xml_node(P(document));\
-        
-        return node;
+        return P(document);
+    }
+
+    xml_node& xml_node::operator[](const std::string& name) {
+        for (xml_node& i : children) 
+            if (i.name == name)
+                return i;
+
+        return null_node;
+    }
+
+    xml_node& xml_node::operator[](const char* name) { 
+        return operator[](std::string(name));
+    }
+
+    xml_node& xml_node::operator[](unsigned int index) {
+        if (index + 1 > children.size()) return null_node;
+
+        return children[index];
+    }
+
+    xml_node& xml_node::operator[](int index) {
+        return operator[]((unsigned int)index);
+    }
+
+    bool xml_node::operator==(const char* a) {
+        return strcmp(value.c_str(), a) == 0;
+    }
+
+    bool xml_node::operator==(std::string& a) {
+        return value == a;
+    }
+
+    xml_node::operator bool() {
+        return exists;
+    }
+
+    xml_node::iterator xml_node::begin() {
+        return xml_node::iterator(children, 0);
+    }
+
+    xml_node::iterator xml_node::end() {
+        return xml_node::iterator(children, children.size());
+    }
+
+    xml_node::iterator::iterator(std::vector<xml_node>& nodes, int pos) : nodes(nodes), pos(pos) {}
+
+    bool xml_node::iterator::operator!=(xml_node::iterator& a) {
+        return pos != a.pos;
+    }
+
+    xml_node::iterator* xml_node::iterator::operator++() {
+        pos++;
+        return this;
+    }
+
+    xml_node& xml_node::iterator::operator*() {
+        return nodes[pos];
     }
 }

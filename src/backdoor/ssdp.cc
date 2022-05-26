@@ -20,7 +20,7 @@ namespace hatred::ssdp {
             int size = 0;
             if ((size = net::readto(socket, msg, 1023, timeout)) > 0) {
                 chunksread++;
-                //DPRINTF("=== upnp recv message (chunk %i, size %i)\n%s\n===\n", chunksread, size, msg);
+                DPRINTF("=== upnp recv message (chunk %i, size %i)\n%s\n===\n", chunksread, size, msg);
 
                 for (int i = 0; i < size; i++) {
                     if (rmode == 0) {

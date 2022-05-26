@@ -31,7 +31,7 @@ int hatred::upnp::send_msearch_m(int socket, hatred::upnp::msearch_m&& req) {
 
     std::string packet = packet_build.str();
     
-//    DPRINTF("=== upnp send mc msearch\n%s\n===\n", packet.c_str());
+    DPRINTF("=== upnp send mc msearch\n%s\n===\n", packet.c_str());
 
     if (sendto(socket, packet.c_str(), packet.length(), 0, (sockaddr*)&ssdp_mc_address, sizeof(ssdp_mc_address)) == -1) {
         return -1;
