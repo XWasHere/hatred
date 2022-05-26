@@ -15,4 +15,6 @@ int hatred::net::readto(int fd, void* buf, int count, int timeout) {
     if (res > 0) {
         if (check.revents & POLLIN) return read(fd, buf, count);
     } else return res;
+
+    
 }

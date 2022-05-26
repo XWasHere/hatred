@@ -33,7 +33,7 @@ namespace hatred::http {
         http_url dest = parse_url(msg.url);
         std::string message;
 
-        DPRINTF("request to \"http://%s:%i/%s\"\n", dest.host.c_str(), dest.port, dest.path.c_str());
+        //DPRINTF("request to \"http://%s:%i/%s\"\n", dest.host.c_str(), dest.port, dest.path.c_str());
 
         message += msg.method + " /" + dest.path + " HTTP/1.1\r\n";
         if (!msg.header.contains("Host")) message += "Host: " + dest.host + ":" + std::to_string(dest.port) + "\r\n";
@@ -42,7 +42,7 @@ namespace hatred::http {
         message += "\r\n";
         message += msg.body;
 
-        DPRINTF("=== send http\n%s\n===\n", message.c_str());
+        //DPRINTF("=== send http\n%s\n===\n", message.c_str());
         send(socket, message.c_str(), message.length(), 0);
 
         return 0;
@@ -58,7 +58,7 @@ namespace hatred::http {
             memset(mbuf, 0, 126);
         }
         
-        DPRINTF("=== recv http\n%s\n===\n", message.c_str());
+        //DPRINTF("=== recv http\n%s\n===\n", message.c_str());
         
         int size = message.length();
         int pos  = 0;
