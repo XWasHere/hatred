@@ -88,14 +88,14 @@ int main() {
 
                 http::connect(httpsock, loc);
 
-                if (http::send_message({
+                if (http::send_request({
                     .url = loc,
                     .header = { 
                         {"CPFN.UPNP.ORG", "asfdasfd"}
                     }
                 }, httpsock, 100) >= 0) {
-                    http::http_message msg;
-                    if (http::recv_message(msg, httpsock, 500) >= 0) {
+                    http::http_response msg;
+                    if (http::recv_response(msg, httpsock, 500) >= 0) {
                         //DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
                         //for (const auto& [k, v] : msg.header) {
                         //    DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
@@ -142,7 +142,7 @@ int main() {
                                                         }
 
                                                         for (int i = 0; i < MAX_PORT; i++) {
-                                                            if (http::send_message({
+                                                            if (http::send_request({
                                                                 .method = "POST",
                                                                 .url = control,
                                                                 .header = {
@@ -159,8 +159,8 @@ int main() {
                                                                     "</s:Body>"
                                                                 "</s:Envelope>\r\n"
                                                             }, httpsock, 100) >= 0) {
-                                                                http::http_message msg;
-                                                                if (http::recv_message(msg, httpsock, 1000) >= 0) {
+                                                                http::http_response msg;
+                                                                if (http::recv_response(msg, httpsock, 1000) >= 0) {
                                                                     //DPRINTF("status: %i %s\n", msg.status, msg.status_reason.c_str());
                                                                     //for (const auto& [k, v] : msg.header) {
                                                                     //    DPRINTF("header \"%s:%s\"\n", k.c_str(), v.c_str());
@@ -177,7 +177,7 @@ int main() {
                                                                             && resp[0][0]["NewPortMappingDescription"] == "") {
                                                                             DPRINTF("cleaning up %s\n", resp[0][0]["NewExternalPort"].value.c_str());
 
-                                                                            http::send_message({
+                                                                            http::send_request({
                                                                                 .method = "POST",
                                                                                 .url = control,
                                                                                 .header = {
@@ -197,8 +197,8 @@ int main() {
                                                                                 "</s:Envelope>\r\n"
                                                                             }, httpsock, 100);
 
-                                                                            http::http_message msg;
-                                                                            http::recv_message(msg, httpsock, 5000);
+                                                                            http::http_response msg;
+                                                                            http::recv_response(msg, httpsock, 5000);
 
                                                                             i--;
                                                                         } else if (xml::xml_node& port_node = resp[0][0]["NewExternalPort"]) {
@@ -225,7 +225,7 @@ int main() {
                                                         
                                                         for (auto port : ports) {
                                                             if (i == 1) {
-                                                                if (http::send_message({
+                                                                if (http::send_request({
                                                                     .method = "POST",
                                                                     .url = control,
                                                                     .header = {
@@ -249,8 +249,8 @@ int main() {
                                                                         "</s:Body>"
                                                                     "</s:Envelope>\r\n"
                                                                 }, httpsock, 100) >= 0) {
-                                                                    http::http_message msg;
-                                                                    http::recv_message(msg, httpsock, 5000);
+                                                                    http::http_response response;
+                                                                    http::recv_response(msg, httpsock, 5000);
 
                                                                     DPRINTF("forwarded *.*.*.*:%i -> %s:42069\n", port, local_ip.c_str());
                                                                 }
