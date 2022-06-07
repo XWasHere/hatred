@@ -1,6 +1,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include <string.h>
 #include <errno.h>
 
 #include "./proto.h"
@@ -13,10 +14,37 @@
 
 namespace hatred::proto {
     int recv_string(int sock, std::string& to) {
-        return 0;
+        int length;
+        char* value;
+
+        if (recv_int(sock, length)) return -1;
+
+        if (length == 0) {
+            to = std::string("");
+            return 0;
+        } else if (length < 128) {
+            value = (char*)alloca(length + 1);
+            memset(value, 0, length + 1);
+            if (recv(sock, value, length, 0) <= 0) return -1;
+            to = std::string(value);
+            return 0;
+        } else {
+            value = (char*)malloc(length + 1);
+            memset(value, 0, length + 1);
+            if (recv(sock, value, length, 0) <= 0) {
+                free(value);
+                return -1;
+            }
+            to = std::string(value);
+            free(value);
+            return 0;
+        }
     }
     
     int send_string(int sock, const std::string& value) {
+        if (send_int(sock, value.length()))               return -1;
+        if (send(sock, value.c_str(), value.length(), 0)) return -1;
+
         return 0;
     }
 
