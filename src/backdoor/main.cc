@@ -19,6 +19,7 @@
 #include "./net.h"
 #include "./http.h"
 #include "./xml.h"
+#include "../proto/proto.h"
 
 #define MAX_PORT 65535
 
@@ -64,6 +65,8 @@ int main() {
     DPRINTF("attempting to start server\n");
 
     DPRINTF("try upnp\n");
+
+    unsigned short listen_port = 0;
 
     int upnpsock = socket(AF_INET, SOCK_DGRAM, PROTO_INET);
     
@@ -220,7 +223,6 @@ int main() {
                                                         std::mt19937                  ralg(rdev());
                                                         std::uniform_int_distribution rprt(1, pcount);
 
-
                                                         int i = rprt(ralg);
                                                         
                                                         for (auto port : ports) {
@@ -253,6 +255,9 @@ int main() {
                                                                     http::recv_response(msg, httpsock, 5000);
 
                                                                     DPRINTF("forwarded *.*.*.*:%i -> %s:42069\n", port, local_ip.c_str());
+
+                                                                    listen_port = port;
+                                                                    goto opened;
                                                                 }
                                                                 break;
                                                             } else i--;
@@ -273,6 +278,46 @@ int main() {
         }
 
         message = ssdp::ssdp_message();
+    } 
+    
+    goto die;
+
+    opened: {
+        printf("%i\n", listen_port);
+
+        int sock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
+
+        int ssov = 1;
+        setsockopt(sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &ssov, sizeof(ssov));
+
+        sockaddr_in listen_addr = {
+            .sin_family = AF_INET,
+            .sin_port = htons(42069),
+            .sin_addr = { .s_addr = INADDR_ANY }
+        };
+
+        bind(sock, (sockaddr*)&listen_addr, sizeof(listen_addr));
+
+        listen(sock, 1);
+
+        sockaddr  client_addr;
+        socklen_t client_size;
+        while (int client = accept(sock, &client_addr, &client_size)) {
+            if (client == -1) break;
+
+            proto::hatred_msg msg;
+            while (proto::hatred_msg::recv(client, msg) >= 0) {
+                DPRINTF("=== recv %i\n%s\n===", msg.length, msg.data);
+            }
+
+            close(client);
+        }
+
+        shutdown(sock, SHUT_RDWR);
+    }
+
+    die: {
+
     }
 
     return 0;
