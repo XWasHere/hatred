@@ -7,4 +7,9 @@
 #   else
 #       define DPRINTF(...)
 #   endif
+#   ifdef DEBUG
+#       define DPERROR(...) perror(__VA_ARGS__)
+#   else
+#       define DPERROR(...)
+#   endif
 #endif

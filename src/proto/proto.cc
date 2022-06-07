@@ -1,19 +1,35 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 
+#include <errno.h>
+
 #include "./proto.h"
 
+#ifdef DEBUG
+#define DDIE(x) { perror(x); return -1; }
+#else
+#define DDIE(x) { return -1; }
+#endif
+
 namespace hatred::proto {
+    int recv_string(int sock, std::string& to) {
+        return 0;
+    }
+    
+    int send_string(int sock, const std::string& value) {
+        return 0;
+    }
+
     int recv_int(int sock, int& to) {
         int dat;
-        if (recv(sock, &dat, 4, 0) <= 0) return -1;
+        if (recv(sock, &dat, 4, 0) <= 0) DDIE("recv");
         to = ntohl(dat);
         return 0;
     }
 
     int send_int(int sock, int value) {
         int dat = htonl(value);
-        if (send(sock, &dat, 4, 0) < 0) return -1;
+        if (send(sock, &dat, 4, 0) < 0) DDIE("send");
         return 0;
     }
 
@@ -27,6 +43,18 @@ namespace hatred::proto {
     int hatred_hdr::send(int sock) {
         if (send_int(sock, length)) return -1;
         if (send_int(sock, op))     return -1;
+
+        return 0;
+    }
+
+    int hatred_echo::recv(int sock, hatred_echo& to) {
+        if (recv_string(sock, to.message)) return -1;
+
+        return 0;
+    }
+
+    int hatred_echo::send(int sock) {
+        if (send_string(sock, message)) return -1;
 
         return 0;
     }

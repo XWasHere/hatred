@@ -98,6 +98,17 @@ int main(int argc, const char** argv) {
                 .length = 0,
                 .op     = 0
             }.send(sock);
+            proto::hatred_echo{
+                .message = echo_string
+            }.send(sock);
+
+            proto::hatred_hdr header;
+            proto::hatred_hdr::recv(sock, header);
+
+            proto::hatred_echo echo;
+            proto::hatred_echo::recv(sock, echo);
+
+            printf("echo: %s\n", echo.message.c_str());
         }
 
         close(sock);

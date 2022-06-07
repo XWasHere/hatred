@@ -285,7 +285,7 @@ int main() {
     opened: {
         printf("%i\n", listen_port);
 
-        int sock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
+        fuck: int sock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
 
         int ssov = 1;
         setsockopt(sock, SOL_SOCKET, SO_REUSEADDR | SO_REUSEPORT, &ssov, sizeof(ssov));
@@ -296,20 +296,39 @@ int main() {
             .sin_addr = { .s_addr = INADDR_ANY }
         };
 
-        bind(sock, (sockaddr*)&listen_addr, sizeof(listen_addr));
+        if(bind(sock, (sockaddr*)&listen_addr, sizeof(listen_addr))) {
+            DPERROR("bind()");
+        };
 
-        listen(sock, 1);
+        if (listen(sock, 1)) {
+            DPERROR("listen()");
+        }
 
         sockaddr  client_addr;
-        socklen_t client_size;
+        socklen_t client_size = sizeof(sockaddr);
         while (int client = accept(sock, &client_addr, &client_size)) {
             if (client == -1) break;
 
             proto::hatred_hdr msg;
             while (proto::hatred_hdr::recv(client, msg) >= 0) {
-                DPRINTF("=== recv %i\n", msg.length);
+                DPRINTF("=== recv %i\n", msg.op);
+
+                if (proto::hatred_op(msg.op) == proto::hatred_op::ECHO) {
+                    proto::hatred_echo body;
+                    proto::hatred_echo::recv(client, body);
+                    proto::hatred_hdr{
+                        .op = (int)proto::hatred_op::ECHO
+                    }.send(client);
+                    proto::hatred_echo{
+                        .message = body.message
+                    }.send(client);
+                }
             }
+
+            client_size = sizeof(sockaddr);
         }
+
+        DPERROR("accept()");
 
         shutdown(sock, SHUT_RDWR);
     }
