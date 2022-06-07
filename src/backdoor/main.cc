@@ -305,12 +305,10 @@ int main() {
         while (int client = accept(sock, &client_addr, &client_size)) {
             if (client == -1) break;
 
-            proto::hatred_msg msg;
-            while (proto::hatred_msg::recv(client, msg) >= 0) {
-                DPRINTF("=== recv %i\n%s\n===", msg.length, msg.data);
+            proto::hatred_hdr msg;
+            while (proto::hatred_hdr::recv(client, msg) >= 0) {
+                DPRINTF("=== recv %i\n", msg.length);
             }
-
-            close(client);
         }
 
         shutdown(sock, SHUT_RDWR);

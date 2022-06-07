@@ -6,11 +6,11 @@
 namespace hatred::proto {
     int recv_int(int sock);
      
-    struct hatred_msg {
-        int   length;
-        char* data;
+    struct hatred_hdr {
+        int length;
+        int op;
 
-        static int recv(int sock, hatred_msg& to);
+        static int recv(int sock, hatred_hdr& to);
         
         int send(int sock);
     };
