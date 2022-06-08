@@ -316,9 +316,11 @@ int main() {
                 if (proto::hatred_op(msg.op) == proto::hatred_op::ECHO) {
                     proto::hatred_echo body;
                     proto::hatred_echo::recv(client, body);
+
                     proto::hatred_hdr{
                         .op = (int)proto::hatred_op::ECHO
                     }.send(client);
+                    
                     proto::hatred_echo{
                         .message = body.message
                     }.send(client);

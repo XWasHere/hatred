@@ -98,6 +98,7 @@ int main(int argc, const char** argv) {
                 .length = 0,
                 .op     = 0
             }.send(sock);
+            
             proto::hatred_echo{
                 .message = echo_string
             }.send(sock);
