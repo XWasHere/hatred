@@ -368,18 +368,29 @@ int main() {
 
                         }
 
-                        FILE* cstdin  = fdopen(stdinp[1], "w");
-                        FILE* cstdout = fdopen(stdoutp[0], "r");
-                        FILE* cstderr = fdopen(stderrp[0], "r");
+                        FILE* pstdin  = fdopen(stdinp[1], "w");
+                        FILE* pstdout = fdopen(stdoutp[0], "r");
+                        FILE* pstderr = fdopen(stderrp[0], "r");
+                        FILE* cstdin  = fdopen(stdinp[0], "r");
+                        FILE* cstdout = fdopen(stdoutp[1], "w");
+                        FILE* cstderr = fdopen(stderrp[1], "w");
 
                         fclose(cstdin);
                         fclose(cstdout);
                         fclose(cstderr);
+                        fclose(pstdin);
+                        fclose(pstdout);
+                        fclose(pstderr);
                     } else {
-                        for (std::string& s : body.args) {
-                            DPRINTF("arg \"%s\"\n", s.c_str());
+                        const char** argv = (const char**)malloc(sizeof(char*) * (body.args.size() + 2));
+                        argv[body.args.size() + 1] = 0;
+                        argv[0] = body.cmd.c_str();
+                        for (int i = 0; i < body.args.size(); i++) {
+                            argv[i + 1] = body.args[i].c_str();
                         }
 
+                        execvp(body.cmd.c_str(), (char*const*)argv);
+                        
                         exit(0);
                     }
                 } 
