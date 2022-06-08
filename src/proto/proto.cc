@@ -86,4 +86,16 @@ namespace hatred::proto {
 
         return 0;
     }
+
+    int hatred_exec::recv(int sock, hatred_exec& to) {
+        if (recv_string(sock, to.cmd)) return -1;
+
+        return 0;
+    }
+
+    int hatred_exec::send(int sock) {
+        if (send_string(sock, cmd)) return -1;
+
+        return 0;
+    }
 }

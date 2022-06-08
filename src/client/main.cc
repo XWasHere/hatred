@@ -13,7 +13,7 @@
 using namespace hatred;
 
 enum class op {
-    OP_NONE, OP_ECHO
+    OP_NONE, OP_ECHO, OP_EXEC
 };
 
 int main(int argc, const char** argv) {
@@ -29,6 +29,7 @@ int main(int argc, const char** argv) {
     };
     
     const char* echo_string = 0;
+    const char* exec_string = 0;
 
     for (int i = 1; i < argc; i++) {
         const char* arg = argv[i];
@@ -46,12 +47,21 @@ int main(int argc, const char** argv) {
                 continue;
             } else if (strcmp(arg, "echo") == 0) {
                 if (op != op::OP_NONE) {
-                    fprintf(stderr, "cant specify multiple ops");
+                    fprintf(stderr, "cant specify multiple ops\n");
                     exit(1);
                 }
 
                 op = op::OP_ECHO;
                 echo_string = argv[++i];
+                continue;
+            } else if (strcmp(arg, "exec") == 0) {
+                if (op != op::OP_NONE) {
+                    fprintf(stderr, "cant specify multiple ops\n");
+                    exit(1);
+                }
+                
+                op = op::OP_EXEC;
+                exec_string = argv[++i];
                 continue;
             } else {
                 fprintf(stderr, "unknown option --%s\n", arg);
@@ -110,6 +120,20 @@ int main(int argc, const char** argv) {
             proto::hatred_echo::recv(sock, echo);
 
             printf("echo: %s\n", echo.message.c_str());
+        } else if (op == op::OP_EXEC) {
+            proto::hatred_hdr{
+                .length = 0,
+                .op     = (int)proto::hatred_op::EXEC
+            }.send(sock);
+
+            proto::hatred_exec{
+                .cmd = exec_string
+            }.send(sock);
+
+            proto::hatred_hdr header;
+            while (proto::hatred_hdr::recv(sock, header) >= 0) {
+                printf("== recv %i\n", header.op);
+            }
         }
 
         close(sock);

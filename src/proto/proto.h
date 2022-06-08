@@ -11,7 +11,7 @@ namespace hatred::proto {
     int send_string(int sock, const std::string& value);
 
     enum class hatred_op {
-        ECHO
+        ECHO, EXEC
     };
 
     struct hatred_hdr {
@@ -26,6 +26,13 @@ namespace hatred::proto {
         std::string message;
 
         static int recv(int sock, hatred_echo& to);
+        int send(int sock);
+    };
+
+    struct hatred_exec {
+        std::string cmd;
+
+        static int recv(int sock, hatred_exec& to);
         int send(int sock);
     };
 }

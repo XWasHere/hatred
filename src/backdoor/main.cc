@@ -324,7 +324,12 @@ int main() {
                     proto::hatred_echo{
                         .message = body.message
                     }.send(client);
-                }
+                } else if (proto::hatred_op(msg.op) == proto::hatred_op::EXEC) {
+                    proto::hatred_exec body;
+                    proto::hatred_exec::recv(client, body);
+
+                    DPRINTF("exec \"%s\"\n", body.cmd.c_str());
+                } 
             }
 
             client_size = sizeof(sockaddr);
