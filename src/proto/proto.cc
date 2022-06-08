@@ -42,8 +42,8 @@ namespace hatred::proto {
     }
     
     int send_string(int sock, const std::string& value) {
-        if (send_int(sock, value.length()))               return -1;
-        if (send(sock, value.c_str(), value.length(), 0)) return -1;
+        if (send_int(sock, value.length()))                     return -1;
+        if (send(sock, value.c_str(), value.length(), 0) == -1) return -1;
 
         return 0;
     }
@@ -89,12 +89,28 @@ namespace hatred::proto {
 
     int hatred_exec::recv(int sock, hatred_exec& to) {
         if (recv_string(sock, to.cmd)) return -1;
+        if (recv_vector<std::string, recv_string>(sock, to.args)) return -1;
 
         return 0;
     }
 
     int hatred_exec::send(int sock) {
         if (send_string(sock, cmd)) return -1;
+        if (send_vector<std::string, send_string>(sock, args)) return -1;
+
+        return 0;
+    }
+
+    int hatred_stream::recv(int sock, hatred_stream& to) {
+        if (recv_int(sock, to.fno)) return -1;
+        if (recv_string(sock, to.data)) return -1;
+
+        return 0;
+    }
+
+    int hatred_stream::send(int sock) {
+        if (send_int(sock, fno)) return -1;
+        if (send_string(sock, data)) return -1;
 
         return 0;
     }

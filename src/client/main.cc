@@ -28,8 +28,9 @@ int main(int argc, const char** argv) {
         .sin_family = AF_INET,
     };
     
-    const char* echo_string = 0;
-    const char* exec_string = 0;
+    const char*  echo_string = 0;
+    const char*  exec_string = 0;
+    int          extra_argc = 0;
 
     for (int i = 1; i < argc; i++) {
         const char* arg = argv[i];
@@ -63,6 +64,9 @@ int main(int argc, const char** argv) {
                 op = op::OP_EXEC;
                 exec_string = argv[++i];
                 continue;
+            } else if (strcmp(arg, "") == 0) {
+                extra_argc = ++i;
+                break;
             } else {
                 fprintf(stderr, "unknown option --%s\n", arg);
                 exit(1);
@@ -121,18 +125,43 @@ int main(int argc, const char** argv) {
 
             printf("echo: %s\n", echo.message.c_str());
         } else if (op == op::OP_EXEC) {
+            std::vector<std::string> args;
+    
+            if (extra_argc) {
+                args.resize(argc - extra_argc);
+                for (int i = extra_argc; i < argc; i++) {
+                    args.push_back(std::string(argv[i]));
+                }
+            }
+
+            // for (std::string& a : args) printf("%s\n", a.c_str());
+    
             proto::hatred_hdr{
                 .length = 0,
                 .op     = (int)proto::hatred_op::EXEC
             }.send(sock);
 
             proto::hatred_exec{
-                .cmd = exec_string
+                .cmd  = exec_string,
+                .args = args
             }.send(sock);
 
             proto::hatred_hdr header;
             while (proto::hatred_hdr::recv(sock, header) >= 0) {
                 printf("== recv %i\n", header.op);
+
+                if (proto::hatred_op(header.op) == proto::hatred_op::STREAM) {
+                    proto::hatred_stream body;
+                    proto::hatred_stream::recv(sock, body);
+
+                    if (body.fno == 1) {
+                        fwrite(body.data.c_str(), 1, body.data.length(), stdout);
+                    } else if (body.fno == 2) {
+                        fwrite(body.data.c_str(), 1, body.data.length(), stderr);
+                    }
+                } else if (proto::hatred_op(header.op) == proto::hatred_op::CLOSE) {
+                    break;
+                }
             }
         }
 

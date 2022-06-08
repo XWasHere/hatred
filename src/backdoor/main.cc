@@ -329,6 +329,59 @@ int main() {
                     proto::hatred_exec::recv(client, body);
 
                     DPRINTF("exec \"%s\"\n", body.cmd.c_str());
+
+                    int stdinp[2];
+                    int stdoutp[2];
+                    int stderrp[2];
+
+                    if (pipe(stdinp)) {
+                        DPERROR("pipe()");
+                    }
+
+                    if (pipe(stdoutp)) {
+                        DPERROR("pipe()");
+                    }
+
+                    if (pipe(stderrp)) {
+                        DPERROR("pipe()");
+                    }
+
+                    if (pid_t cpid = fork()) {
+
+                        if (cpid == -1) {
+                            DPERROR("fork()");
+                            
+                            proto::hatred_hdr{
+                                .length = 0,
+                                .op = (int)proto::hatred_op::CLOSE
+                            }.send(client);
+
+                            close(stdinp[0]);
+                            close(stdinp[1]);
+                            close(stdoutp[0]);
+                            close(stdoutp[1]);
+                            close(stderrp[0]);
+                            close(stderrp[1]);
+
+                            continue;
+                        } else {
+
+                        }
+
+                        FILE* cstdin  = fdopen(stdinp[1], "w");
+                        FILE* cstdout = fdopen(stdoutp[0], "r");
+                        FILE* cstderr = fdopen(stderrp[0], "r");
+
+                        fclose(cstdin);
+                        fclose(cstdout);
+                        fclose(cstderr);
+                    } else {
+                        for (std::string& s : body.args) {
+                            DPRINTF("arg \"%s\"\n", s.c_str());
+                        }
+
+                        exit(0);
+                    }
                 } 
             }
 
