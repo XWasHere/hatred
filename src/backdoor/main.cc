@@ -11,6 +11,7 @@
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <poll.h>
 
 #include "./ssdp.h"
@@ -375,7 +376,77 @@ int main() {
                         FILE* cstdout = fdopen(stdoutp[1], "w");
                         FILE* cstderr = fdopen(stderrp[1], "w");
 
-                        fclose(cstdin);
+                        setvbuf(pstdout, 0, _IONBF, 0);
+                        setvbuf(pstderr, 0, _IONBF, 0);
+                        setvbuf(cstdout, 0, _IONBF, 0);
+                        setvbuf(cstderr, 0, _IONBF, 0);
+
+                        pollfd streams[4] = {
+                            {
+                                .fd = stdinp[1],
+                                .events = POLLRDHUP
+                            },
+                            {
+                                .fd = stdoutp[0],
+                                .events = POLLIN | POLLRDHUP
+                            },
+                            {
+                                .fd = stderrp[0],
+                                .events = POLLIN | POLLRDHUP
+                            },
+                            {
+                                .fd     = client,
+                                .events = POLLIN | POLLRDHUP
+                            }
+                        };
+
+                        DPRINTF("start accepting child io\n");
+
+                        while (poll(streams, 4, 1000) != -1) {
+                            if ((streams[0].revents | streams[1].revents | streams[2].revents | streams[3].revents) & (POLLHUP | POLLERR | POLLRDHUP)) {
+                                break;
+                            }
+
+                            if (streams[1].revents & POLLIN) {
+                                char buf[128] = {};
+                                int read = ::read(stdoutp[0], buf, 128);
+                                //fprintf(stdout, "STDOUT ===\n%s\n===", buf);
+
+                                proto::hatred_hdr{
+                                    .length = 0,
+                                    .op = (int)proto::hatred_op::STREAM
+                                }.send(client);
+
+                                proto::hatred_stream{
+                                    .fno = 1,
+                                    .data = std::string(buf)
+                                }.send(client);
+                            }
+
+                            if (streams[2].revents & POLLIN) {
+                                char buf[128] = {};
+                                int read = ::read(stderrp[0], buf, 128);
+                                //fprintf(stdout, "STDERR ===\n%s\n===", buf);
+
+                                proto::hatred_hdr{
+                                    .length = 0,
+                                    .op = (int)proto::hatred_op::STREAM
+                                }.send(client);
+
+                                proto::hatred_stream{
+                                    .fno = 1,
+                                    .data = std::string(buf)
+                                }.send(client);
+                            }
+
+                            if (streams[3].revents & POLLIN) {
+                                
+                            }
+                        }
+
+                        DPRINTF("kill child\n");
+
+                        fclose(cstdin); // hopefully this will kill the child
                         fclose(cstdout);
                         fclose(cstderr);
                         fclose(pstdin);
@@ -388,6 +459,10 @@ int main() {
                         for (int i = 0; i < body.args.size(); i++) {
                             argv[i + 1] = body.args[i].c_str();
                         }
+
+                        dup2(stdinp[0], 0);
+                        dup2(stdoutp[1], 1);
+                        dup2(stderrp[1], 2);
 
                         execvp(body.cmd.c_str(), (char*const*)argv);
                         
