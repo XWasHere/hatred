@@ -168,7 +168,7 @@ int main(int argc, const char** argv) {
             tcgetattr(0, &orig_tios);
             
             curr_tios = orig_tios;
-            curr_tios.c_lflag &= ~(ICANON | _ECHO);
+            curr_tios.c_lflag &= ~(ICANON);
             curr_tios.c_cc[VINTR] = _POSIX_VDISABLE;
             
             tcsetattr(0, TCSANOW, &curr_tios);
@@ -184,7 +184,15 @@ int main(int argc, const char** argv) {
 
                     for (int i = 0; i < read; i++) if (buf[i] == 3) exit(0);
 
-                    printf("STDIN: %s\n", buf);
+                    proto::hatred_hdr{
+                        .length = 0,
+                        .op = (int)proto::hatred_op::STREAM
+                    }.send(sock);
+
+                    proto::hatred_stream{
+                        .fno = 0,
+                        .data = std::string(buf)
+                    }.send(sock);
                 }
 
                 if (streams[1].revents & POLLIN) {

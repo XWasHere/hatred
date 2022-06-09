@@ -440,7 +440,15 @@ int main() {
                             }
 
                             if (streams[3].revents & POLLIN) {
-                                
+                                proto::hatred_hdr    header;
+                                proto::hatred_hdr::recv(client, header);
+
+                                proto::hatred_stream body;
+                                proto::hatred_stream::recv(client, body);
+
+                                if (body.fno == 0) {
+                                    ::write(stdinp[1], body.data.c_str(), body.data.length());
+                                }
                             }
                         }
 
