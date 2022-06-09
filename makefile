@@ -62,6 +62,6 @@ build/proto/proto.o: src/proto/proto.cc src/proto/proto.h
 	mkdir -p build/proto/
 	$(CXX) $(CXX_ARGS) -c src/proto/proto.cc -o build/proto/proto.o
 
-build/client/main.o: src/client/main.cc src/proto/proto.h
+build/client/main.o: src/client/main.cc src/proto/proto.h src/common/fnutil.h
 	mkdir -p build/client/
 	$(CXX) $(CXX_ARGS) -c src/client/main.cc -o build/client/main.o

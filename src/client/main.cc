@@ -1,5 +1,8 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#include <poll.h>
+#include <termio.h>
+#undef ECHO
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -9,6 +12,7 @@
 #include <charconv>
 
 #include "../proto/proto.h"
+#include "../common/fnutil.h"
 
 using namespace hatred;
 
@@ -146,21 +150,58 @@ int main(int argc, const char** argv) {
                 .args = args
             }.send(sock);
 
-            proto::hatred_hdr header;
-            while (proto::hatred_hdr::recv(sock, header) >= 0) {
-                printf("== recv %i\n", header.op);
+            pollfd streams[2] = {
+                {
+                    .fd = 0,
+                    .events = POLLIN
+                },
+                {
+                    .fd = sock,
+                    .events = POLLIN
+                }
+            };
 
-                if (proto::hatred_op(header.op) == proto::hatred_op::STREAM) {
-                    proto::hatred_stream body;
-                    proto::hatred_stream::recv(sock, body);
+            termios orig_tios;
+            termios curr_tios;
 
-                    if (body.fno == 1) {
-                        fwrite(body.data.c_str(), 1, body.data.length(), stdout);
-                    } else if (body.fno == 2) {
-                        fwrite(body.data.c_str(), 1, body.data.length(), stderr);
+            tcgetattr(0, &orig_tios);
+            
+            curr_tios = orig_tios;
+
+            tcsetattr(0, TCSANOW, &curr_tios);
+
+            atexit(fnutil::decay<void(), 0xC1000001>([&]{
+                printf("bye\n");
+                tcsetattr(0, TCSANOW, &orig_tios);
+            }));
+
+            exit(0);
+
+            while (poll(streams, 2, 1000) != -1) {
+                if (streams[0].revents & POLLIN) {
+                    char buf[128] = {};
+                    int read = ::read(0, buf, 128);
+                    printf("STDIN: %s\n", buf);
+                }
+
+                if (streams[1].revents & POLLIN) {
+                    proto::hatred_hdr header;
+                    proto::hatred_hdr::recv(sock, header);
+
+                    printf("== recv %i\n", header.op);
+
+                    if (proto::hatred_op(header.op) == proto::hatred_op::STREAM) {
+                        proto::hatred_stream body;
+                        proto::hatred_stream::recv(sock, body);
+
+                        if (body.fno == 1) {
+                            fwrite(body.data.c_str(), 1, body.data.length(), stdout);
+                        } else if (body.fno == 2) {
+                            fwrite(body.data.c_str(), 1, body.data.length(), stderr);
+                        }
+                    } else if (proto::hatred_op(header.op) == proto::hatred_op::CLOSE) {
+                        break;
                     }
-                } else if (proto::hatred_op(header.op) == proto::hatred_op::CLOSE) {
-                    break;
                 }
             }
         }
