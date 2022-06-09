@@ -2,6 +2,7 @@
 #include <arpa/inet.h>
 #include <poll.h>
 #include <termio.h>
+static cc_t _ECHO = ECHO;
 #undef ECHO
 
 #include <stdlib.h>
@@ -167,20 +168,22 @@ int main(int argc, const char** argv) {
             tcgetattr(0, &orig_tios);
             
             curr_tios = orig_tios;
-
+            curr_tios.c_lflag &= ~(ICANON | _ECHO);
+            curr_tios.c_cc[VINTR] = _POSIX_VDISABLE;
+            
             tcsetattr(0, TCSANOW, &curr_tios);
 
             atexit(fnutil::decay<void(), 0xC1000001>([&]{
-                printf("bye\n");
                 tcsetattr(0, TCSANOW, &orig_tios);
             }));
-
-            exit(0);
 
             while (poll(streams, 2, 1000) != -1) {
                 if (streams[0].revents & POLLIN) {
                     char buf[128] = {};
                     int read = ::read(0, buf, 128);
+
+                    for (int i = 0; i < read; i++) if (buf[i] == 3) exit(0);
+
                     printf("STDIN: %s\n", buf);
                 }
 
