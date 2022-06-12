@@ -55,10 +55,6 @@ namespace hatred::http {
         HTTP_VERSION_NOT_SUPPORTED      = 505
     };
 
-    enum struct http_message_type {
-        GENERIC, REQUEST, RESPONSE
-    };
-
     struct http_response {
         unsigned int version_minor;
         unsigned int version_major;

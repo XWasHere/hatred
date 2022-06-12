@@ -34,15 +34,15 @@ out/hatred: $(BACKDOOR_OBJS)
 out/hatredctl: $(CLIENT_OBJS)
 	$(CXX) $(CXX_ARGS) $(CLIENT_OBJS) -o out/hatredctl
 
-build/backdoor/main.o: src/backdoor/main.cc src/backdoor/net.h src/backdoor/util.h src/backdoor/upnp.h src/backdoor/http.h src/backdoor/ssdp.h src/backdoor/xml.h src/proto/proto.h
+build/backdoor/main.o: src/backdoor/main.cc src/backdoor/net.h src/common/util.h src/backdoor/upnp.h src/backdoor/http.h src/backdoor/ssdp.h src/backdoor/xml.h src/proto/proto.h
 	mkdir -p build/backdoor/
 	$(CXX) $(CXX_ARGS) -c src/backdoor/main.cc -o build/backdoor/main.o
 
-build/backdoor/net.o: src/backdoor/net.cc src/backdoor/net.h src/backdoor/util.h
+build/backdoor/net.o: src/backdoor/net.cc src/backdoor/net.h src/common/util.h
 	mkdir -p build/backdoor/
 	$(CXX) $(CXX_ARGS) -c src/backdoor/net.cc -o build/backdoor/net.o
 
-build/backdoor/upnp.o: src/backdoor/upnp.cc src/backdoor/net.h src/backdoor/util.h src/backdoor/upnp.h
+build/backdoor/upnp.o: src/backdoor/upnp.cc src/backdoor/net.h src/common/util.h src/backdoor/upnp.h
 	mkdir -p build/backdoor/
 	$(CXX) $(CXX_ARGS) -c src/backdoor/upnp.cc -o build/backdoor/upnp.o
 

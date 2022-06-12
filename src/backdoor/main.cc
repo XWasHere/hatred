@@ -15,7 +15,7 @@
 #include <poll.h>
 
 #include "./ssdp.h"
-#include "./util.h"
+#include "../common/util.h"
 #include "./upnp.h"
 #include "./net.h"
 #include "./http.h"

@@ -1,6 +1,6 @@
 #include <string.h>
 
-#include "util.h"
+#include "../common/util.h"
 #include "net.h"
 #include "ssdp.h"
 

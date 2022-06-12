@@ -3,7 +3,7 @@
 
 #include <stdio.h>
 
-#include "./util.h"
+#include "../common/util.h"
 
 #define SSDP_MC_PORT 1900
 #define SSDP_MC_ADDR "239.255.255.250"

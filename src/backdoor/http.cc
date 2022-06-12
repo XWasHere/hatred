@@ -10,7 +10,7 @@
 
 #include "./http.h"
 #include "./net.h"
-#include "./util.h"
+#include "../common/util.h"
 //#include "../common/fdstream.h"
 
 namespace hatred::http {
