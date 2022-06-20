@@ -24,7 +24,7 @@ namespace hatred::http {
         };
 
         if (::connect(socket, (sockaddr*)&addr, sizeof(addr))) {
-            DPRINTF("connection issue, please implement error information niko\n");
+            DPERROR("connect()");
             return 1;
         }
 

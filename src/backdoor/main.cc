@@ -288,8 +288,6 @@ int main() {
     goto die;
 
     opened: {
-        printf("%i\n", listen_port);
-
         fuck: int sock = socket(AF_INET, SOCK_STREAM, PROTO_INET);
 
         int ssov = 1;
