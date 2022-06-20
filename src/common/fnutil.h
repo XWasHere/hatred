@@ -12,8 +12,9 @@ namespace hatred::fnutil {
 
     // it was helpful getting this from stackoverflow, but i feel i can improve on it. ill need to see if i can set up decay to do the thing if used is true, i doubt it though, im pretty sure that would just cause infinite recursion
     // just a thing to make me think i guess
-    template<unsigned int, class CB, class RT, class... AT>
+    template<unsigned int a, class CB, class RT, class... AT>
     auto __decay(CB&& c, RT(*)(AT...)) {
+        static int  id = a;
         static bool used = 0;
         static cadata<CB> cadata;
         using catype = decltype(cadata.callable);

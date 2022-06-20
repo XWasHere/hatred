@@ -34,7 +34,9 @@ int main(int argc, const char** argv) {
     };
     
     const char*  echo_string = 0;
+
     const char*  exec_string = 0;
+
     int          extra_argc = 0;
 
     for (int i = 1; i < argc; i++) {
@@ -107,6 +109,8 @@ int main(int argc, const char** argv) {
     if (op != op::OP_NONE) {
         int sock = socket(AF_INET, SOCK_STREAM, 0);
 
+        printf("%s:%s\n", ip_raw, port_raw);
+        
         if (connect(sock, (sockaddr*)&target_addr, sizeof(target_addr))) {
             perror("connect()");
             exit(1);
@@ -135,11 +139,11 @@ int main(int argc, const char** argv) {
             if (extra_argc) {
                 args.resize(argc - extra_argc);
                 for (int i = extra_argc; i < argc; i++) {
-                    args.push_back(std::string(argv[i]));
+                    args[i - extra_argc] = std::string(argv[i]);
                 }
             }
 
-            // for (std::string& a : args) printf("%s\n", a.c_str());
+            for (std::string& a : args) printf("%s\n", a.c_str());
     
             proto::hatred_hdr{
                 .length = 0,
@@ -158,7 +162,7 @@ int main(int argc, const char** argv) {
                 },
                 {
                     .fd = sock,
-                    .events = POLLIN
+                    .events = POLLIN 
                 }
             };
 
@@ -175,6 +179,10 @@ int main(int argc, const char** argv) {
 
             atexit(fnutil::decay<void(), 0xC1000001>([&]{
                 tcsetattr(0, TCSANOW, &orig_tios);
+                if (streams[1].fd != -1) {
+                    close(streams[1].fd);
+                    streams[1].fd = -1;
+                }
             }));
 
             while (poll(streams, 2, 1000) != -1) {
@@ -197,9 +205,9 @@ int main(int argc, const char** argv) {
 
                 if (streams[1].revents & POLLIN) {
                     proto::hatred_hdr header;
-                    proto::hatred_hdr::recv(sock, header);
+                    if (proto::hatred_hdr::recv(sock, header)) exit(0);
 
-                    printf("== recv %i\n", header.op);
+                    // printf("== recv %i\n", header.op);
 
                     if (proto::hatred_op(header.op) == proto::hatred_op::STREAM) {
                         proto::hatred_stream body;
@@ -213,6 +221,10 @@ int main(int argc, const char** argv) {
                     } else if (proto::hatred_op(header.op) == proto::hatred_op::CLOSE) {
                         break;
                     }
+                }
+
+                if (streams[1].revents & POLLHUP) {
+                    exit(1);
                 }
             }
         }

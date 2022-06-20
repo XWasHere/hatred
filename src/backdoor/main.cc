@@ -1,9 +1,11 @@
 // for educational purposes only
 
 #include <charconv>
+#include <csignal>
 #include <list>
 #include <random>
 
+#include <sys/wait.h>
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -13,7 +15,9 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
+#include <signal.h>
 
+#include "../common/fnutil.h"
 #include "./ssdp.h"
 #include "../common/util.h"
 #include "./upnp.h"
@@ -307,11 +311,20 @@ int main() {
 
         sockaddr  client_addr;
         socklen_t client_size = sizeof(sockaddr);
+
+        atexit(fnutil::decay<void(), 0xbd551>([&sock]{
+            if (sock != -1) {
+                shutdown(sock, SHUT_RDWR);
+                sock = -1;
+            }
+            DPRINTF("exit");
+        }));
+
         while (int client = accept(sock, &client_addr, &client_size)) {
             if (client == -1) break;
 
             proto::hatred_hdr msg;
-            while (proto::hatred_hdr::recv(client, msg) >= 0) {
+            while (client != -1 && proto::hatred_hdr::recv(client, msg) >= 0) {
                 DPRINTF("=== recv %i\n", msg.op);
 
                 if (proto::hatred_op(msg.op) == proto::hatred_op::ECHO) {
@@ -335,20 +348,12 @@ int main() {
                     int stdoutp[2];
                     int stderrp[2];
 
-                    if (pipe(stdinp)) {
+                    if (pipe(stdinp) || pipe(stdoutp) || pipe(stderrp)) {
                         DPERROR("pipe()");
-                    }
-
-                    if (pipe(stdoutp)) {
-                        DPERROR("pipe()");
-                    }
-
-                    if (pipe(stderrp)) {
-                        DPERROR("pipe()");
+                        goto killcon;
                     }
 
                     if (pid_t cpid = fork()) {
-
                         if (cpid == -1) {
                             DPERROR("fork()");
                             
@@ -363,10 +368,8 @@ int main() {
                             close(stdoutp[1]);
                             close(stderrp[0]);
                             close(stderrp[1]);
-
-                            continue;
-                        } else {
-
+                            
+                            goto killcon;
                         }
 
                         FILE* pstdin  = fdopen(stdinp[1], "w");
@@ -402,6 +405,20 @@ int main() {
 
                         DPRINTF("start accepting child io\n");
 
+
+                        struct sigaction oact = {};
+                        struct sigaction act  = {};
+                        act.sa_flags = 0;
+                        act.sa_handler = fnutil::decay<void(int), 0xbd552>([&](int a){
+                            if (cpid != -1) waitpid(cpid, 0, WUNTRACED);
+                            close(client);
+                            client = -1;
+                            cpid = -1;
+                            sigaction(SIGCHLD, &oact, NULL);
+                        });
+                        
+                        sigaction(SIGCHLD, &act, &oact);
+                        
                         while (poll(streams, 4, 1000) != -1) {
                             if ((streams[0].revents | streams[1].revents | streams[2].revents | streams[3].revents) & (POLLHUP | POLLERR | POLLRDHUP)) {
                                 break;
@@ -454,6 +471,19 @@ int main() {
 
                         DPRINTF("kill child\n");
 
+                        if (cpid > 0) {
+                            if (kill(cpid, SIGTERM)) {
+                                DPERROR("kill");
+                            } else {
+                                sleep(1);
+                                if (kill(cpid, SIGKILL)) {
+                                    DPERROR("kill");
+                                };
+                            }
+                            waitpid(cpid, 0, WUNTRACED);
+                        }
+
+
                         fclose(cstdin); // hopefully this will kill the child
                         fclose(cstdout);
                         fclose(cstderr);
@@ -479,12 +509,21 @@ int main() {
                 } 
             }
 
+killcon:    if (client != -1) {
+                close(client);
+                client = -1;
+            }
+
             client_size = sizeof(sockaddr);
+            memset(&client_addr, 0, client_size);
+
+            DPRINTF("accepting clients\n");
         }
 
         DPERROR("accept()");
 
         shutdown(sock, SHUT_RDWR);
+        sock = -1;
     }
 
     die: {
