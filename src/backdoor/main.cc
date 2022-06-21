@@ -2,6 +2,7 @@
 
 #include <charconv>
 #include <csignal>
+#include <functional>
 #include <list>
 #include <random>
 
@@ -425,7 +426,8 @@ int main() {
                             if (streams[1].revents & POLLIN) {
                                 char buf[128] = {};
                                 int read = ::read(stdoutp[0], buf, 128);
-                                //fprintf(stdout, "STDOUT ===\n%s\n===", buf);
+                                
+                                fprintf(stdout, "STDOUT ===\n%s\n===", buf);
 
                                 proto::hatred_hdr{
                                     .length = 0,
@@ -474,13 +476,10 @@ int main() {
                                 DPERROR("kill");
                             } else {
                                 sleep(1);
-                                if (kill(cpid, SIGKILL)) {
-                                    DPERROR("kill");
-                                };
+                                if (cpid != -1) kill(cpid, SIGKILL);
                             }
                             waitpid(cpid, 0, WUNTRACED);
                         }
-
 
                         fclose(cstdin); // hopefully this will kill the child
                         fclose(cstdout);
