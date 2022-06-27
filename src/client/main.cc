@@ -190,7 +190,10 @@ int main(int argc, const char** argv) {
                     char buf[128] = {};
                     int read = ::read(0, buf, 128);
 
-                    for (int i = 0; i < read; i++) if (buf[i] == 3) exit(0);
+                    for (int i = 0; i < read; i++) if (buf[i] == 3) {
+                        close(sock);
+                        exit(0);
+                    }
 
                     proto::hatred_hdr{
                         .length = 0,

