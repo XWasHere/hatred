@@ -1,5 +1,9 @@
+#ifndef __WIN32
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#else
+#include <winsock2.h>
+#endif
 #include <stdio.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -12,7 +16,11 @@ using namespace std::string_literals;
 static sockaddr_in ssdp_mc_address = {
     .sin_family = AF_INET,
     .sin_port   = htons(SSDP_MC_PORT),
+#ifndef _WIN32
     .sin_addr   = { .s_addr = inet_addr(SSDP_MC_ADDR) }
+#else
+    .sin_addr   = { .S_un = { .S_addr = inet_addr(SSDP_MC_ADDR) } }
+#endif
 };
 
 int hatred::upnp::send_msearch_m(int socket, hatred::upnp::msearch_m&& req) {

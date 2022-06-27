@@ -1,8 +1,12 @@
 #include <string>
 #include <charconv>
 
+#ifndef __WIN32
 #include <sys/socket.h>
 #include <arpa/inet.h>
+#else
+#include <winsock2.h>
+#endif
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
@@ -20,7 +24,11 @@ namespace hatred::http {
         sockaddr_in addr = {
             .sin_family = AF_INET,
             .sin_port   = htons(to.port),
+#ifndef __WIN32
             .sin_addr   = { .s_addr = inet_addr(to.host.c_str()) }
+#else
+            .sin_addr   = { .S_un = { .S_addr = inet_addr(to.host.c_str()) } }
+#endif
         };
 
         if (::connect(socket, (sockaddr*)&addr, sizeof(addr))) {
@@ -57,33 +65,33 @@ namespace hatred::http {
         char mbuf[127];
 
         memset(mbuf, 0, 127);
-        fread(mbuf, 1, 5, sock);
-        
+        recv(socket, mbuf, 5, 0);
+
         if (strcmp(mbuf, "HTTP/") == 0) { // response
             to.version_major = 0;
             to.version_minor = 0;
             
             while (1) {
-                fread(mbuf, 1, 1, sock);
+                recv(socket, mbuf, 1, 0);
                 if (mbuf[0] == '.') break;
                 to.version_major *= 10;
                 to.version_major += mbuf[0] - '0';
             }
 
             while (1) {
-                fread(mbuf, 1, 1, sock);
+                recv(socket, mbuf, 1, 0);
                 if (mbuf[0] == ' ') break;
                 to.version_minor *= 10;
                 to.version_minor += mbuf[0] - '0';
             }
 
-            fread(mbuf, 1, 4, sock);
+            recv(socket, mbuf, 4, 0);
             to.status = (mbuf[0] - '0') * 100 + (mbuf[1] - '0') * 10 + (mbuf[2] - '0');
 
             while (1) {
-                fread(mbuf, 1, 1, sock);
+                recv(socket, mbuf, 1, 0);
                 if (mbuf[0] == '\r') {
-                    fread(mbuf + 1, 1, 1, sock);
+                    recv(socket, mbuf + 1, 1, 0);
                     if (mbuf[1] == '\n') {
                         break;
                     } else {
@@ -99,38 +107,37 @@ namespace hatred::http {
                 std::string f;
                 std::string v;
 
-                fread(mbuf, 1, 1, sock);
+                recv(socket, mbuf, 2, MSG_PEEK);
                 if (mbuf[0] == '\r') {
-                    fread(mbuf + 1, 1, 1, sock);
                     if (mbuf[1] == '\n') {
+                        recv(socket, mbuf, 2, 0);
                         break;
                     }
-                    ungetc(mbuf[1], sock);
                 }
-                ungetc(mbuf[0], sock);
 
                 while (1) {
-                    fread(mbuf, 1, 1, sock);
+                    recv(socket, mbuf, 1, 0);
                     if (mbuf[0] == ':') break;
                     f += mbuf[0];
                 }
 
                 while (1) {
-                    fread(mbuf, 1, 1, sock);
+                    recv(socket, mbuf, 1, MSG_PEEK);
                     if (mbuf[0] != ' ') {
-                        ungetc(mbuf[0], sock);
                         break;
+                    } else {
+                        recv(socket, mbuf, 1, 0);
                     }
                 }
                 
                 while (1) {
-                    fread(mbuf, 1, 1, sock);
+                    recv(socket, mbuf, 1, 0);
                     if (mbuf[0] == '\r') {
-                        fread(mbuf + 1, 1, 1, sock);
+                        recv(socket, mbuf + 1, 1, MSG_PEEK);
                         if (mbuf[1] == '\n') {
+                            recv(socket, mbuf, 1, 0);
                             break;
                         }
-                        ungetc(mbuf[1], sock);
                     }
 
                     v += mbuf[0];
@@ -153,9 +160,9 @@ namespace hatred::http {
                         
                         int read;
                         if (length < 127) {
-                            read = fread(mbuf, 1, length, sock);
+                            read = recv(socket, mbuf, length, 0);
                         } else {
-                            read = fread(mbuf, 1, 126, sock);
+                            read = recv(socket, mbuf, 126, 0);
                         }
 
                         if (read > 0) {
