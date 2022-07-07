@@ -1,8 +1,5 @@
-#ifndef HATRED_NET_H
-#define HATRED_NET_H
+#pragma once
 
 namespace hatred::net {
     int readto(int fd, void* buf, int count, int timeout);
 };
-
-#endif

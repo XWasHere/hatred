@@ -1,5 +1,4 @@
-#ifndef HATRED_FNUTIL_H
-#define HATRED_FNUTIL_H
+#pragma once
 
 #include <functional>
 
@@ -35,5 +34,3 @@ namespace hatred::fnutil {
         return __decay<N>(std::forward<CB>(c), (F*)0);
     }
 };
-
-#endif

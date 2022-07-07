@@ -1,5 +1,4 @@
-#ifndef HATRED_PROTO_H
-#define HATRED_PROTO_H
+#pragma once
 
 #include <vector>
 #include <string>
@@ -143,7 +142,7 @@ namespace hatred::proto {
     struct hatred_putfile {
         std::string name;
         hatred_file file;
-        
+
         static int recv(int sock, hatred_putfile& to) = delete;
         int send(int sock) = delete;
     };
@@ -155,5 +154,3 @@ namespace hatred::proto {
         int send(int sock) = delete;
     };
 }
-
-#endif

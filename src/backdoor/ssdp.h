@@ -1,5 +1,4 @@
-#ifndef HATRED_SSDP_H
-#define HATRED_SSDP_H
+#pragma once
 
 #include <map>
 #include <string>
@@ -14,5 +13,3 @@ namespace hatred::ssdp {
 
     int recv_message(ssdp_message& to, int socket, int timeout);
 };
-
-#endif

@@ -1,5 +1,4 @@
-#ifndef HATRED_UPNP_H
-#define HATRED_UPNP_H
+#pragma once
 
 #include <stdio.h>
 
@@ -36,5 +35,3 @@ namespace hatred::upnp {
     // msearch
     int send_msearch_m(int socket, msearch_m&& req);
 };
-
-#endif

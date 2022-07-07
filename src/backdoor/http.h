@@ -1,5 +1,4 @@
-#ifndef HATRED_HTTP_H
-#define HATRED_HTTP_H
+#pragma once
 
 #include <map>
 #include <string>
@@ -91,5 +90,3 @@ namespace hatred::http {
     
     int connect(int socket, const std::string& url);
 }
-
-#endif

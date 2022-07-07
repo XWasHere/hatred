@@ -1,5 +1,4 @@
-#ifndef HATRED_XML_H
-#define HATRED_XML_H
+#pragma once
 
 #include <string.h>
 
@@ -53,5 +52,3 @@ namespace hatred::xml {
 
     xml_node parse_xml(std::string& source);
 }
-
-#endif
