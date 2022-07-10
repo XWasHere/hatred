@@ -4,6 +4,13 @@
 #include <string>
 
 namespace hatred::proto {
+    namespace internal {
+        template<class T>
+        inline int generic_send(int sock, const T& value) {
+            return value.send(sock);
+        }
+    };
+
     int recv_int(int sock, int& to);
     int send_int(int sock, int value);
     
@@ -11,7 +18,7 @@ namespace hatred::proto {
     int send_string(int sock, const std::string& value);
 
     // TODO(@xwashere): this wont work for ints
-    template<class T, int recv(int, T&)>
+    template<class T, int recv(int, T&) = T::recv>
     int recv_vector(int sock, std::vector<T>& to) {
         int length;
         if (recv_int(sock, length)) return -1;
@@ -26,7 +33,7 @@ namespace hatred::proto {
         
         return 0;
     }
-    template<class T, int send(int, const T&)>
+    template<class T, int send(int, const T&) = internal::generic_send<T>>
     int send_vector(int sock, const std::vector<T>& value) {
         if (send_int(sock, value.size())) return -1;
         
@@ -44,6 +51,10 @@ namespace hatred::proto {
         ECHO, 
         EXEC, STREAM,
         GETFINFO, GETDIR, MKDIR, RMDIR, GETFILE, PUTFILE, RMFILE
+    };
+
+    enum class hatred_ftype {
+        FILE, DIR
     };
 
     struct hatred_hdr {
@@ -82,75 +93,75 @@ namespace hatred::proto {
     };
 
     struct hatred_finfo {
-        bool dir;
+        int type;
 
         std::string name;
 
-        static int recv(int sock, hatred_finfo& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_finfo& to);
+        int send(int sock);
     };
 
     struct hatred_dir {
         std::vector<hatred_finfo> content;
 
-        static int recv(int sock, hatred_dir& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_dir& to);
+        int send(int sock);
     };
 
     struct hatred_file {
         std::string content;
 
-        static int recv(int sock, hatred_file& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_file& to);
+        int send(int sock);
     };
 
     struct hatred_getfinfo {
         std::string name;
 
-        static int recv(int sock, hatred_getfinfo& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_getfinfo& to);
+        int send(int sock);
     };
 
     struct hatred_getdir {
         std::string name;
         
-        static int recv(int sock, hatred_getdir& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_getdir& to);
+        int send(int sock);
     };
 
     struct hatred_mkdir {
         std::string name;
         
-        static int recv(int sock, hatred_mkdir& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_mkdir& to);
+        int send(int sock);
     };
 
     struct hatred_rmdir {
         std::string name;
         
-        static int recv(int sock, hatred_rmdir& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_rmdir& to);
+        int send(int sock);
     };
 
     struct hatred_getfile {
         std::string name;
         
-        static int recv(int sock, hatred_getfile& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_getfile& to);
+        int send(int sock);
     };
 
     struct hatred_putfile {
         std::string name;
         hatred_file file;
 
-        static int recv(int sock, hatred_putfile& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_putfile& to);
+        int send(int sock);
     };
 
     struct hatred_rmfile {
         std::string name;
         
-        static int recv(int sock, hatred_rmfile& to) = delete;
-        int send(int sock) = delete;
+        static int recv(int sock, hatred_rmfile& to);
+        int send(int sock);
     };
 }

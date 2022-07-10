@@ -122,4 +122,128 @@ namespace hatred::proto {
 
         return 0;
     }
+
+    int hatred_finfo::recv(int sock, hatred_finfo &to) {
+        if (recv_int(sock, to.type))    return -1;
+        if (recv_string(sock, to.name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_finfo::send(int sock) {
+        if (send_int(sock, type))    return -1;
+        if (send_string(sock, name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_dir::recv(int sock, hatred_dir &to) {
+        if (recv_vector<hatred_finfo>(sock, to.content)) return -1;
+
+        return 0;
+    }
+
+    int hatred_dir::send(int sock) {
+        if (send_vector<hatred_finfo>(sock, content)) return -1;
+
+        return 0;
+    }
+    
+    int hatred_file::recv(int sock, hatred_file &to) {
+        if (recv_string(sock, to.content)) return -1;
+
+        return 0;
+    }
+
+    int hatred_file::send(int sock) {
+        if (send_string(sock, content)) return -1;
+
+        return 0;
+    }
+
+    int hatred_getfinfo::recv(int sock, hatred_getfinfo &to) {
+        if (recv_string(sock, to.name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_getfinfo::send(int sock) {
+        if (send_string(sock, name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_getdir::recv(int sock, hatred_getdir &to) {
+        if (recv_string(sock, to.name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_getdir::send(int sock) {
+        if (send_string(sock, name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_mkdir::recv(int sock, hatred_mkdir &to) {
+        if (recv_string(sock, to.name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_mkdir::send(int sock) {
+        if (send_string(sock, name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_rmdir::recv(int sock, hatred_rmdir &to) {
+        if (recv_string(sock, to.name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_rmdir::send(int sock) {
+        if (send_string(sock, name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_getfile::recv(int sock, hatred_getfile &to) {
+        if (recv_string(sock, to.name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_getfile::send(int sock) {
+        if (send_string(sock, name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_putfile::recv(int sock, hatred_putfile &to) {
+        if (recv_string(sock, to.name)) return -1;
+        if (hatred_file::recv(sock, to.file)) return -1;
+
+        return 0;
+    }
+
+    int hatred_putfile::send(int sock) {
+        if (send_string(sock, name)) return -1;
+        if (file.send(sock)) return -1;
+
+        return 0;
+    }
+
+    int hatred_rmfile::recv(int sock, hatred_rmfile &to) {
+        if (recv_string(sock, to.name)) return -1;
+
+        return 0;
+    }
+
+    int hatred_rmfile::send(int sock) {
+        if (send_string(sock, name)) return -1;
+
+        return 0;
+    }
 }
