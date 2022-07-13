@@ -1,3 +1,5 @@
+#include <sys/types.h>
+#include <system_error>
 #ifndef __WIN32
 #include <sys/socket.h>
 #include <arpa/inet.h>
@@ -21,6 +23,30 @@
 #endif
 
 namespace hatred::proto {
+    std::string hatred_strerror(hatred_errno e) {
+        switch (e) {
+            case hatred_errno::NEXIST: return "file does not exist";
+            case hatred_errno::NDIR:   return "not a directory";
+            case hatred_errno::NEMPTY: return "not empty";
+            case hatred_errno::CFAIL:
+            default:                   return "catastrophic failure";
+        }
+    }
+
+    int send_error(int sock, std::error_code e) {
+        if (hatred_hdr{.length = 0, .op = (int)hatred_op::ERROR}.send(sock)) return -1;
+        
+        hatred_errno en = hatred_errno::CFAIL;
+
+        if      (e == std::errc::no_such_file_or_directory) en = hatred_errno::NEXIST;
+        else if (e == std::errc::not_a_directory)           en = hatred_errno::NDIR;
+        else if (e == std::errc::directory_not_empty)       en = hatred_errno::NEMPTY;
+
+        if (hatred_error{.what = en}.send(sock)) return -1;
+
+        return 0;
+    }
+
     int recv_string(int sock, std::string& to) {
         int length;
         char* value;
@@ -39,11 +65,17 @@ namespace hatred::proto {
         } else {
             value = (char*)malloc(length + 1);
             memset(value, 0, length + 1);
-            if (recv(sock, (char*)value, length, 0) <= 0) {
-                free(value);
-                return -1;
+            
+            int left = length; // this used to just read one big bit but recently i learned that sometimes that doesnt totally work
+            int pos  = 0;
+            ssize_t res;
+            while ((res = recv(sock, (char*)value + pos, left, 0)) && res > 0) {
+                pos += res;
+                left -= res;
             }
-            to = std::string(value);
+            if (res == -1) return -1;
+
+            to = std::string(value, length);
             free(value);
             return 0;
         }
@@ -83,6 +115,32 @@ namespace hatred::proto {
         return 0;
     }
 
+    int hatred_error::recv(int sock, hatred_error &to) {
+        if (internal::generic_recv(sock, to.what)) return -1;
+
+        return 0;
+    }
+
+    int hatred_error::send(int sock) {
+        if (internal::generic_send(sock, what)) return -1;
+
+        return 0;
+    }
+
+    int hatred_stream::recv(int sock, hatred_stream& to) {
+        if (recv_int(sock, to.fno)) return -1;
+        if (recv_string(sock, to.data)) return -1;
+
+        return 0;
+    }
+
+    int hatred_stream::send(int sock) {
+        if (send_int(sock, fno)) return -1;
+        if (send_string(sock, data)) return -1;
+
+        return 0;
+    }
+
     int hatred_echo::recv(int sock, hatred_echo& to) {
         if (recv_string(sock, to.message)) return -1;
 
@@ -105,20 +163,6 @@ namespace hatred::proto {
     int hatred_exec::send(int sock) {
         if (send_string(sock, cmd)) return -1;
         if (send_vector<std::string, send_string>(sock, args)) return -1;
-
-        return 0;
-    }
-
-    int hatred_stream::recv(int sock, hatred_stream& to) {
-        if (recv_int(sock, to.fno)) return -1;
-        if (recv_string(sock, to.data)) return -1;
-
-        return 0;
-    }
-
-    int hatred_stream::send(int sock) {
-        if (send_int(sock, fno)) return -1;
-        if (send_string(sock, data)) return -1;
 
         return 0;
     }
@@ -223,14 +267,12 @@ namespace hatred::proto {
 
     int hatred_putfile::recv(int sock, hatred_putfile &to) {
         if (recv_string(sock, to.name)) return -1;
-        if (hatred_file::recv(sock, to.file)) return -1;
 
         return 0;
     }
 
     int hatred_putfile::send(int sock) {
         if (send_string(sock, name)) return -1;
-        if (file.send(sock)) return -1;
 
         return 0;
     }

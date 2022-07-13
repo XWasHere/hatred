@@ -1,18 +1,33 @@
 #pragma once
 
+#include <type_traits>
 #include <vector>
 #include <string>
+#include <system_error>
 
 namespace hatred::proto {
+    int recv_int(int sock, int& to);
+    int send_int(int sock, int value);
+
     namespace internal {
         template<class T>
         inline int generic_send(int sock, const T& value) {
-            return value.send(sock);
+            if constexpr (std::is_enum_v<T>) {
+                return send_int(sock, (int&)value);
+            } else {
+                return value.send(sock);
+            }
+        }
+
+        template<class T>
+        inline int generic_recv(int sock, T& to) {
+            if constexpr (std::is_enum_v<T>) {
+                return recv_int(sock, (int&)to);
+            } else {
+                return T::recv(sock, to);
+            }
         }
     };
-
-    int recv_int(int sock, int& to);
-    int send_int(int sock, int value);
     
     int recv_string(int sock, std::string& to);
     int send_string(int sock, const std::string& value);
@@ -43,14 +58,21 @@ namespace hatred::proto {
     }
 
     enum class hatred_errno {
-
+        CFAIL,  // unknown
+        NEXIST, // file does not exist
+        NDIR,   // not a directory
+        NEMPTY  // not empty
     };
 
+    std::string hatred_strerror(hatred_errno e);
+    int        send_error(int sock, std::error_code e);
+
     enum class hatred_op {
-        CLOSE, ERROR,
+        CLOSE, ERROR, ACK,
+        STREAM,
         ECHO, 
-        EXEC, STREAM,
-        GETFINFO, GETDIR, MKDIR, RMDIR, GETFILE, PUTFILE, RMFILE
+        EXEC,
+        GETFINFO, GETDIR, MKDIR, RMDIR, GETFILE, PUTFILE, RMFILE, DIRDT, FILDT, FINDT
     };
 
     enum class hatred_ftype {
@@ -67,6 +89,9 @@ namespace hatred::proto {
 
     struct hatred_error {
         hatred_errno what;
+
+        static int recv(int sock, hatred_error& to);
+        int send(int sock);
     };
 
     struct hatred_echo {
@@ -152,7 +177,6 @@ namespace hatred::proto {
 
     struct hatred_putfile {
         std::string name;
-        hatred_file file;
 
         static int recv(int sock, hatred_putfile& to);
         int send(int sock);
