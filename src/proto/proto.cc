@@ -63,7 +63,7 @@ namespace hatred::proto {
             to = std::string(value);
             return 0;
         } else {
-            value = (char*)malloc(length + 1);
+            if ((value = (char*)malloc(length + 1)) == 0) return -1;
             memset(value, 0, length + 1);
             
             int left = length; // this used to just read one big bit but recently i learned that sometimes that doesnt totally work
@@ -108,7 +108,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_hdr::send(int sock) {
+    int hatred_hdr::send(int sock) const {
         if (send_int(sock, length))           return -1;
         if (internal::generic_send(sock, op)) return -1;
 
@@ -125,7 +125,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_error::send(int sock) {
+    int hatred_error::send(int sock) const {
         if (internal::generic_send(sock, what)) return -1;
 
         return 0;
@@ -151,7 +151,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_stream::send(int sock) {
+    int hatred_stream::send(int sock) const {
         if (send_int(sock, fno)) return -1;
         if (send_string(sock, data)) return -1;
 
@@ -178,7 +178,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_echo::send(int sock) {
+    int hatred_echo::send(int sock) const {
         if (send_string(sock, message)) return -1;
 
         return 0;
@@ -204,7 +204,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_exec::send(int sock) {
+    int hatred_exec::send(int sock) const {
         if (send_string(sock, cmd)) return -1;
         if (send_vector<std::string, send_string>(sock, args)) return -1;
 
@@ -232,7 +232,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_finfo::send(int sock) {
+    int hatred_finfo::send(int sock) const {
         if (send_int(sock, type))    return -1;
         if (send_string(sock, name)) return -1;
 
@@ -245,7 +245,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_dir::send(int sock) {
+    int hatred_dir::send(int sock) const {
         if (send_vector<hatred_finfo>(sock, content)) return -1;
 
         return 0;
@@ -257,7 +257,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_getfinfo::send(int sock) {
+    int hatred_getfinfo::send(int sock) const {
         if (send_string(sock, name)) return -1;
 
         return 0;
@@ -282,7 +282,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_getdir::send(int sock) {
+    int hatred_getdir::send(int sock) const {
         if (send_string(sock, name)) return -1;
 
         return 0;
@@ -307,7 +307,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_mkdir::send(int sock) {
+    int hatred_mkdir::send(int sock) const {
         if (send_string(sock, name)) return -1;
 
         return 0;
@@ -332,7 +332,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_rmdir::send(int sock) {
+    int hatred_rmdir::send(int sock) const {
         if (send_string(sock, name)) return -1;
 
         return 0;
@@ -357,7 +357,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_getfile::send(int sock) {
+    int hatred_getfile::send(int sock) const {
         if (send_string(sock, name)) return -1;
 
         return 0;
@@ -382,7 +382,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_putfile::send(int sock) {
+    int hatred_putfile::send(int sock) const {
         if (send_string(sock, name)) return -1;
 
         return 0;
@@ -407,7 +407,7 @@ namespace hatred::proto {
         return 0;
     }
 
-    int hatred_rmfile::send(int sock) {
+    int hatred_rmfile::send(int sock) const {
         if (send_string(sock, name)) return -1;
 
         return 0;

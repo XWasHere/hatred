@@ -17,7 +17,7 @@ struct parse_node {
 };
 
 #define P(N, ...)  parse_##N(pos, source, ##__VA_ARGS__)
-#define PN(N, ...) static parse_node parse_##N(int& pos, std::string& source, ##__VA_ARGS__)
+#define PN(N, ...) static parse_node parse_##N(uint32_t& pos, std::string& source, ##__VA_ARGS__)
 
 PN(s) {
     parse_node node;
@@ -54,15 +54,15 @@ PN(pi) {
 
 PN(element) {
     parse_node node;
-    int        bpos = pos;
+    uint32_t   bpos = pos;
 
     if (pos < source.length() && source[pos] == '<' && source[pos + 1] != '/') {
         hatred::xml::xml_node nd;
         
         pos++;
         
-        int bg = pos;
-        int bc = 0;
+        uint32_t bg = pos;
+        uint32_t bc = 0;
         while (pos < source.length() && !(P(s) || source[pos] == '/' || source[pos] == '>')) {
             bc++;
             pos++;
@@ -175,7 +175,7 @@ static hatred::xml::xml_node null_node { .exists = 0 };
 
 namespace hatred::xml {
     xml_node parse_xml(std::string& source) {
-        int pos = 0;
+        uint32_t pos = 0;
 
         return P(document);
     }

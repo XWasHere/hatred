@@ -1,5 +1,10 @@
 #pragma once
 
+#ifndef __WIN32
+#include <sys/socket.h>
+#else
+#include <winsock2.h>
+#endif
 #include <map>
 #include <string>
 
@@ -53,6 +58,12 @@ namespace hatred::http {
         GATEWAY_TIME_OUT                = 504,
         HTTP_VERSION_NOT_SUPPORTED      = 505
     };
+    
+    namespace flags {
+        const unsigned int NOFIX = 1;
+        const unsigned int DGRAM = 2;
+        const unsigned int VBURL = 4;
+    }
 
     struct http_response {
         unsigned int version_minor;
@@ -80,10 +91,11 @@ namespace hatred::http {
         std::string body;
     };
 
-    int send_request(const http_request& msg, int socket, int timeout);
-    int recv_request(      http_request& to,  int socket, int timeout);
+    int send_request(const http_request& msg, int socket, int timeout, unsigned int flags = 0);
+    int send_request(const http_request& msg, int socket, int timeout, sockaddr* to, size_t tsiz, unsigned int flags = 0);
+    // int recv_request(      http_request& to,  int socket, int timeout) = delete;
 
-    int send_response(const http_response& msg, int socket, int timeout);
+    // int send_response(const http_response& msg, int socket, int timeout, bool nofix = 0);
     int recv_response(      http_response& to,  int socket, int timeout);
     
     http_url parse_url(const std::string& url);

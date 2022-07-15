@@ -53,7 +53,7 @@ namespace hatred::proto {
         int length;
         if (recv_int(sock, length)) return -1;
 
-        if (to.capacity() < length) to.resize(length);
+        if (to.capacity() < (uint32_t)length) to.resize(length);
         
         for (int i = 0; i < length; i++) {
             T val;
@@ -109,7 +109,7 @@ namespace hatred::proto {
         hatred_op op;
 
         static int recv(int sock, hatred_hdr& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, hatred_op what);
     };
@@ -118,7 +118,7 @@ namespace hatred::proto {
         hatred_errno what;
 
         static int recv(int sock, hatred_error& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, hatred_errno what);
 
@@ -129,7 +129,7 @@ namespace hatred::proto {
         std::string message;
 
         static int recv(int sock, hatred_echo& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& message);
 
@@ -141,7 +141,7 @@ namespace hatred::proto {
         std::vector<std::string> args;
 
         static int recv(int sock, hatred_exec& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& cmd, const std::vector<std::string>& args);
 
@@ -153,30 +153,34 @@ namespace hatred::proto {
         std::string data;
 
         static int recv(int sock, hatred_stream& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, int fd, const std::string& data);
 
         static inline constexpr int p_size(const std::string& data) { return size_int() + size_string(data); }
     };
 
-    struct hatred_finfo {
-        int type;
+    DIAG_APPLY(
+        DIAG_IGNORE("-Wanalyzer-null-dereference")
+        DIAG_IGNORE("-Wanalyzer-possible-null-dereference")
+        struct hatred_finfo { 
+            int type;
 
-        std::string name;
+            std::string name;
 
-        static int recv(int sock, hatred_finfo& to);
-        int send(int sock);
+            static int recv(int sock, hatred_finfo& to);
+            int send(int sock) const;
 
-        static inline constexpr int p_size(const std::string& name) { return size_int() + size_string(name); }
-        inline constexpr int p_size() const { return p_size(name); }
-    };
+            static inline constexpr int p_size(const std::string& name) { return size_int() + size_string(name); }
+            inline constexpr int p_size() const { return p_size(name); }
+        };
+    )
 
     struct hatred_dir {
         std::vector<hatred_finfo> content;
 
         static int recv(int sock, hatred_dir& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static inline constexpr int p_size(const std::vector<hatred_finfo>& data) { return size_vector(data); }
     };
@@ -185,7 +189,7 @@ namespace hatred::proto {
         std::string name;
 
         static int recv(int sock, hatred_getfinfo& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& data);
 
@@ -196,7 +200,7 @@ namespace hatred::proto {
         std::string name;
         
         static int recv(int sock, hatred_getdir& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& data);
 
@@ -207,7 +211,7 @@ namespace hatred::proto {
         std::string name;
         
         static int recv(int sock, hatred_mkdir& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& data);
         
@@ -218,7 +222,7 @@ namespace hatred::proto {
         std::string name;
         
         static int recv(int sock, hatred_rmdir& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& data);
         
@@ -229,7 +233,7 @@ namespace hatred::proto {
         std::string name;
         
         static int recv(int sock, hatred_getfile& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& data);
         
@@ -240,7 +244,7 @@ namespace hatred::proto {
         std::string name;
 
         static int recv(int sock, hatred_putfile& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& data);
         
@@ -251,7 +255,7 @@ namespace hatred::proto {
         std::string name;
         
         static int recv(int sock, hatred_rmfile& to);
-        int send(int sock);
+        int send(int sock) const;
 
         static int sendp(int sock, const std::string& data);
         

@@ -17,18 +17,18 @@ namespace hatred::ssdp {
         while (1) {
             memset(msg, 0, 1024);
             
-            int size = 0;
+            uint32_t size = 0;
             if ((size = net::readto(socket, msg, 1023, timeout)) > 0) {
                 chunksread++;
                 DPRINTF("=== upnp recv message (chunk %i, size %i)\n%s\n===\n", chunksread, size, msg);
 
-                for (int i = 0; i < size; i++) {
+                for (uint32_t i = 0; i < size; i++) {
                     if (rmode == 0) {
                         if (size - i >= strlen("HTTP/1.1 200 OK\r\n")) {
                             const int hlen = sizeof("M-SEARCH * HTTP/1.1\r\n");
                             
-                            char dat[sizeof("M-SEARCH * HTTP/1.1\r\n")];
-                            memset(dat, 0, sizeof(dat));
+                            char dat[hlen];
+                            memset(dat, 0, hlen);
 
                             switch (msg[i]) {
                                 case 'N': {

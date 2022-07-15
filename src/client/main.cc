@@ -323,7 +323,7 @@ int main(int argc, const char** argv) {
                                 proto::hatred_stream sd;
                                 if (!proto::hatred_stream::recv(sock, sd)) {
                                     if (sd.data.size() == 0) break;
-                                    if (fwrite(sd.data.c_str(), 1, sd.data.size(), out) == -1) {
+                                    if (!fwrite(sd.data.c_str(), 1, sd.data.size(), out)) {
                                         perror("fwrite()");
                                         close(sock);
                                         fclose(out);

@@ -1,5 +1,6 @@
 #pragma once
 
+#ifdef __WIN32
 #include <winsock2.h>
 #include <ws2tcpip.h>
 
@@ -22,3 +23,4 @@ inline int setsockopt(int socket, int level, int option_name, const void* option
 inline int pipe(int filedes[2]) {
     return _pipe(filedes, 4096, _O_BINARY);
 }
+#endif

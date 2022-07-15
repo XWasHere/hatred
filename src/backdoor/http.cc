@@ -39,21 +39,47 @@ namespace hatred::http {
         return 0;
     }
 
-    int send_request(const http_request& msg, int socket, int timeout) {
-        http_url dest = parse_url(msg.url);
+    int http_write_message(const http_request& in, std::string& out, unsigned int flags) {
+        using namespace flags;
+
+        http_url dest;
+        if (!(flags & VBURL)) {
+            dest = parse_url(in.url);
+            DPRINTF("request to \"http://%s:%i/%s\"\n", dest.host.c_str(), dest.port, dest.path.c_str());
+        }
+
+        out += flags & VBURL ? in.url : in.method + ((flags & NOFIX) ? " " : " /") + dest.path + " HTTP/1.1\r\n";
+        if (!(flags & VBURL) && !in.header.contains("Host")) out += "Host: " + dest.host + ":" + std::to_string(dest.port) + "\r\n";
+        if (!in.header.contains("Content-Length")) out += "Content-Length: " + std::to_string(in.body.length()) + "\r\n";
+        for (auto [k, v] : in.header) out += k + ": " + v + "\r\n";
+        out += "\r\n";
+        out += in.body;
+
+        return 0;
+    }
+
+    int send_request(const http_request& msg, int socket, int timeout, unsigned int flags) {
+        using namespace flags;
+        
         std::string message;
-
-        DPRINTF("request to \"http://%s:%i/%s\"\n", dest.host.c_str(), dest.port, dest.path.c_str());
-
-        message += msg.method + " /" + dest.path + " HTTP/1.1\r\n";
-        if (!msg.header.contains("Host")) message += "Host: " + dest.host + ":" + std::to_string(dest.port) + "\r\n";
-        if (!msg.header.contains("Content-Length")) message += "Content-Length: " + std::to_string(msg.body.length()) + "\r\n";
-        for (auto [k, v] : msg.header) message += k + ": " + v + "\r\n";
-        message += "\r\n";
-        message += msg.body;
+        http_write_message(msg, message, flags);
 
         DPRINTF("=== send http\n%s\n===\n", message.c_str());
         send(socket, message.c_str(), message.length(), 0);
+
+        return 0;
+    }
+
+    int send_request(const http_request& msg, int socket, int timeout, sockaddr* to, size_t tsiz, unsigned int flags) {
+        using namespace flags;
+
+        std::string message;
+        http_write_message(msg, message, flags);
+
+        DPRINTF("=== send http\n%s\n===\n", message.c_str());
+        if (sendto(socket, message.c_str(), message.length(), 0, to, tsiz) == -1) {
+            return -1;
+        };
 
         return 0;
     }
@@ -196,15 +222,15 @@ namespace hatred::http {
     }
 
     http_url parse_url(const std::string& surl) {
-        http_url url = {};
+        http_url url;
 
-        if (surl.length() >= strlen("http://") && surl.substr(0, strlen("http://")) == "http://") {
-            int i = strlen("http://");
+        if (surl.starts_with("http://")) { //a
+            unsigned long i = strlen("http://");
 
             for (; i < surl.length() && surl[i] != ':' && surl[i] != '/'; i++) url.host += surl[i];
 
             if (surl[i] == ':') {
-                int start = ++i;
+                unsigned long start = ++i;
                 for (; i < surl.length() && surl[i] != '/'; i++);
 
                 std::from_chars(surl.c_str() + start, surl.c_str() + i, url.port);

@@ -4,10 +4,6 @@
 
 #include "../common/util.h"
 
-#define SSDP_MC_PORT 1900
-#define SSDP_MC_ADDR "239.255.255.250"
-#define SSDP_MC_HOST SSDP_MC_ADDR ":" STRINGIFY(SSDP_MC_PORT)
-
 namespace hatred::upnp {
     // M-SEARCH
     struct msearch_m {

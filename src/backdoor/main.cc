@@ -97,8 +97,8 @@ int main(int argc, const char** argv) {
     int upnpsock = socket(AF_INET, SOCK_DGRAM, PROTO_INET);
     
     upnp::send_msearch_m(upnpsock, {
-        .max_wait = 1,
-        .search_target = "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
+       .max_wait = 1,
+       .search_target = "urn:schemas-upnp-org:device:InternetGatewayDevice:1"
     });
 
     ssdp::ssdp_message message = ssdp::ssdp_message();
@@ -674,7 +674,7 @@ int main(int argc, const char** argv) {
                             const char** argv = (const char**)malloc(sizeof(char*) * (body.args.size() + 2));
                             argv[body.args.size() + 1] = 0;
                             argv[0] = body.cmd.c_str();
-                            for (int i = 0; i < body.args.size(); i++) {
+                            for (uint32_t i = 0; i < body.args.size(); i++) {
                                 argv[i + 1] = body.args[i].c_str();
                             }
 
@@ -750,7 +750,7 @@ int main(int argc, const char** argv) {
                                             proto::hatred_stream sd;
                                             if (!proto::hatred_stream::recv(client, sd)) {
                                                 if (sd.data.size() == 0) break;
-                                                if (fwrite(sd.data.c_str(), 1, sd.data.size(), file) == -1) {
+                                                if (fwrite(sd.data.c_str(), 1, sd.data.size(), file) == 0) {
                                                     DPERROR("fwrite()");
                                                     fclose(file);
                                                     std::error_code err;
