@@ -11,3 +11,6 @@
 #else
 #   define DPERROR(...)
 #endif
+namespace hatred::util {
+    template<class T, T V> T select_overload = V;
+}

@@ -4,6 +4,7 @@
 #include <sys/socket.h>
 #include <arpa/inet.h>
 #include <poll.h>
+#include <system_error>
 #include <termio.h>
 static cc_t _ECHO = ECHO;
 #undef ECHO
@@ -169,14 +170,7 @@ int main(int argc, const char** argv) {
         }
 
         if (op == op::OP_ECHO) {
-            proto::hatred_hdr{
-                .length = 0,
-                .op     = 0
-            }.send(sock);
-            
-            proto::hatred_echo{
-                .message = echo_string
-            }.send(sock);
+            proto::hatred_echo::sendp(sock, echo_string);
 
             proto::hatred_hdr header;
             proto::hatred_hdr::recv(sock, header);
@@ -197,15 +191,7 @@ int main(int argc, const char** argv) {
 
             for (std::string& a : args) printf("%s\n", a.c_str());
     
-            proto::hatred_hdr{
-                .length = 0,
-                .op     = (int)proto::hatred_op::EXEC
-            }.send(sock);
-
-            proto::hatred_exec{
-                .cmd  = exec_string,
-                .args = args
-            }.send(sock);
+            proto::hatred_exec::sendp(sock, exec_string, args);
 
             pollfd streams[2] = {
                 {
@@ -247,15 +233,7 @@ int main(int argc, const char** argv) {
                         exit(0);
                     }
 
-                    proto::hatred_hdr{
-                        .length = 0,
-                        .op = (int)proto::hatred_op::STREAM
-                    }.send(sock);
-
-                    proto::hatred_stream{
-                        .fno = 0,
-                        .data = std::string(buf)
-                    }.send(sock);
+                    proto::hatred_stream::sendp(sock, 0, std::string(buf, read));
                 }
 
                 if (streams[1].revents & POLLIN) {
@@ -264,7 +242,7 @@ int main(int argc, const char** argv) {
 
                     // printf("== recv %i\n", header.op);
 
-                    if (proto::hatred_op(header.op) == proto::hatred_op::STREAM) {
+                    if (header.op == proto::hatred_op::STREAM) {
                         proto::hatred_stream body;
                         proto::hatred_stream::recv(sock, body);
 
@@ -273,7 +251,7 @@ int main(int argc, const char** argv) {
                         } else if (body.fno == 2) {
                             fwrite(body.data.c_str(), 1, body.data.length(), stderr);
                         }
-                    } else if (proto::hatred_op(header.op) == proto::hatred_op::CLOSE) {
+                    } else if (header.op == proto::hatred_op::CEXIT || header.op == proto::hatred_op::CLOSE) {
                         break;
                     }
                 }
@@ -289,18 +267,11 @@ int main(int argc, const char** argv) {
                 exit(1);
             }
 
-            proto::hatred_hdr{
-                .length = 0,
-                .op     = (int)proto::hatred_op::GETDIR
-            }.send(sock);
-
-            proto::hatred_getdir{
-                .name   = std::string(fop_path)
-            }.send(sock);
+            proto::hatred_getdir::sendp(sock, std::string(fop_path));
 
             proto::hatred_hdr res;
             if (!proto::hatred_hdr::recv(sock, res)) {
-                if (proto::hatred_op(res.op) == proto::hatred_op::DIRDT) {
+                if (res.op == proto::hatred_op::DIRDT) {
                     proto::hatred_dir info;
                     if (!proto::hatred_dir::recv(sock, info)) {
                         for (const auto& f : info.content) {
@@ -314,7 +285,7 @@ int main(int argc, const char** argv) {
                             printf("%c????????? ? ? ? ? ? %s\n", t, f.name.c_str());
                         }
                     }
-                } else if (proto::hatred_op(res.op) == proto::hatred_op::ERROR) {
+                } else if (res.op == proto::hatred_op::ERROR) {
                     proto::hatred_error err;
                     if (!proto::hatred_error::recv(sock, err)) {
                         fprintf(stderr, "%s\n", proto::hatred_strerror(err.what).c_str());
@@ -341,21 +312,14 @@ int main(int argc, const char** argv) {
                 exit(1);
             }
 
-            proto::hatred_hdr{
-                .length = 0,
-                .op     = (int)proto::hatred_op::GETFILE
-            }.send(sock);
-
-            proto::hatred_getfile{
-                .name   = std::string(fop_path)
-            }.send(sock);
+            proto::hatred_getfile::sendp(sock, std::string(fop_path));
 
             proto::hatred_hdr res;
             if (!proto::hatred_hdr::recv(sock, res)) {
-                if (proto::hatred_op(res.op) == proto::hatred_op::ACK) {
+                if (res.op == proto::hatred_op::ACK) {
                     while (1) {
                         if (!proto::hatred_hdr::recv(sock, res)) {
-                            if (proto::hatred_op(res.op) == proto::hatred_op::STREAM) {
+                            if (res.op == proto::hatred_op::STREAM) {
                                 proto::hatred_stream sd;
                                 if (!proto::hatred_stream::recv(sock, sd)) {
                                     if (sd.data.size() == 0) break;
@@ -372,12 +336,13 @@ int main(int argc, const char** argv) {
                     }
 
                     fclose(out);
-                } else if (proto::hatred_op(res.op) == proto::hatred_op::ERROR) {
+                } else if (res.op == proto::hatred_op::ERROR) {
                     proto::hatred_error err;
                     if (!proto::hatred_error::recv(sock, err)) {
                         fprintf(stderr, "%s\n", proto::hatred_strerror(err.what).c_str());
                         fclose(out);
-                        std::filesystem::remove(fop_path2);
+                        std::error_code ec;
+                        std::filesystem::remove(fop_path2, ec);
                     }
                 }
             }
@@ -402,32 +367,23 @@ int main(int argc, const char** argv) {
                 exit(1);
             }
 
-            proto::hatred_hdr{
-                .length = 0,
-                .op     = (int)proto::hatred_op::PUTFILE
-            }.send(sock);
-
-            proto::hatred_putfile{
-                .name   = std::string(fop_path)
-            }.send(sock);
+            proto::hatred_putfile::sendp(sock, std::string(fop_path));
 
             proto::hatred_hdr res;
             if (!proto::hatred_hdr::recv(sock, res)) {
-                if (proto::hatred_op(res.op) == proto::hatred_op::ACK) {
+                if (res.op == proto::hatred_op::ACK) {
                     char* chunk = new char[STREAM_CHUNK_SIZE];
 
                     while (size_t csiz = fread(chunk, 1, STREAM_CHUNK_SIZE, file)) {
-                        proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::STREAM}.send(sock);
-                        proto::hatred_stream{.fno = 0, .data = std::string(chunk, csiz)}.send(sock);
+                        proto::hatred_stream::sendp(sock, 0, std::string(chunk, csiz));
                     }
 
                     delete[] chunk;
 
-                    proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::STREAM}.send(sock);
-                    proto::hatred_stream{.fno = 0, .data = ""}.send(sock);
+                    proto::hatred_stream::sendp(sock, 0, "");
 
                     fclose(file);
-                } else if (proto::hatred_op(res.op) == proto::hatred_op::ERROR) {
+                } else if (res.op == proto::hatred_op::ERROR) {
                     proto::hatred_error err;
                     if (!proto::hatred_error::recv(sock, err)) {
                         fprintf(stderr, "%s\n", proto::hatred_strerror(err.what).c_str());
@@ -441,20 +397,13 @@ int main(int argc, const char** argv) {
                 exit(1);
             }
 
-            proto::hatred_hdr{
-                .length = 0,
-                .op     = (int)proto::hatred_op::RMFILE
-            }.send(sock);
-
-            proto::hatred_rmfile{
-                .name   = std::string(fop_path)
-            }.send(sock);
+            proto::hatred_rmfile::sendp(sock, std::string(fop_path));
 
             proto::hatred_hdr res;
             if (!proto::hatred_hdr::recv(sock, res)) {
-                if (proto::hatred_op(res.op) == proto::hatred_op::ACK) {
+                if (res.op == proto::hatred_op::ACK) {
                     printf("deleted \"%s\"\n", fop_path);
-                } else if (proto::hatred_op(res.op) == proto::hatred_op::ERROR) {
+                } else if (res.op == proto::hatred_op::ERROR) {
                     proto::hatred_error err;
                     if (!proto::hatred_error::recv(sock, err)) {
                         fprintf(stderr, "%s\n", proto::hatred_strerror(err.what).c_str());

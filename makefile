@@ -1,4 +1,4 @@
-CXX_COMMON_ARGS= -O3 -fpermissive --std=c++23 -DDEBUG
+CXX_COMMON_ARGS= -O3 -fpermissive --std=c++23 -DDEBUG -ggdb -fanalyzer -Wall
 ifdef WINDOWS
 CXX=      x86_64-w64-mingw32-g++ -static-libgcc -static-libstdc++ -static
 CXX_LIBS= -lws2_32

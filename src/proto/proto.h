@@ -5,13 +5,20 @@
 #include <string>
 #include <system_error>
 
+#include "../common/util.h"
+
 namespace hatred::proto {
     int recv_int(int sock, int& to);
     int send_int(int sock, int value);
+    constexpr int size_int() { return 4; }
+
+    int recv_string(int sock, std::string& to);
+    int send_string(int sock, const std::string& value);
+    constexpr int size_string(const std::string& value) { return size_int() + value.size(); }
 
     namespace internal {
         template<class T>
-        inline int generic_send(int sock, const T& value) {
+        int generic_send(int sock, const T& value) {
             if constexpr (std::is_enum_v<T>) {
                 return send_int(sock, (int&)value);
             } else {
@@ -20,20 +27,28 @@ namespace hatred::proto {
         }
 
         template<class T>
-        inline int generic_recv(int sock, T& to) {
+        int generic_recv(int sock, T& to) {
             if constexpr (std::is_enum_v<T>) {
                 return recv_int(sock, (int&)to);
             } else {
                 return T::recv(sock, to);
             }
         }
+
+        template<class T>
+        constexpr int generic_size(const T& value) {
+            if constexpr (std::is_enum_v<T>) {
+                return size_int();
+            } else if constexpr (std::is_same_v<std::string, T>) {
+                return size_string(value);
+            } else {
+                return value.p_size();
+            }
+        }
     };
-    
-    int recv_string(int sock, std::string& to);
-    int send_string(int sock, const std::string& value);
 
     // TODO(@xwashere): this wont work for ints
-    template<class T, int recv(int, T&) = T::recv>
+    template<class T, int recv(int, T&) = internal::generic_recv<T>>
     int recv_vector(int sock, std::vector<T>& to) {
         int length;
         if (recv_int(sock, length)) return -1;
@@ -56,6 +71,16 @@ namespace hatred::proto {
 
         return 0;
     }
+    template<class T, int size(const T&) = internal::generic_size<T>>
+    constexpr int size_vector(const std::vector<T>& value) {
+        int s = size_int();
+
+        for (const T& v : value) {
+            s += size(v);
+        }
+
+        return s;
+    }
 
     enum class hatred_errno {
         CFAIL,  // unknown
@@ -65,13 +90,13 @@ namespace hatred::proto {
     };
 
     std::string hatred_strerror(hatred_errno e);
-    int        send_error(int sock, std::error_code e);
+    int         send_error(int sock, std::error_code e);
 
     enum class hatred_op {
         CLOSE, ERROR, ACK,
         STREAM,
         ECHO, 
-        EXEC,
+        EXEC, CEXIT,
         GETFINFO, GETDIR, MKDIR, RMDIR, GETFILE, PUTFILE, RMFILE, DIRDT, FILDT, FINDT
     };
 
@@ -80,11 +105,13 @@ namespace hatred::proto {
     };
 
     struct hatred_hdr {
-        int length;
-        int op;
+        int       length;
+        hatred_op op;
 
         static int recv(int sock, hatred_hdr& to);
         int send(int sock);
+
+        static int sendp(int sock, hatred_op what);
     };
 
     struct hatred_error {
@@ -92,6 +119,10 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_error& to);
         int send(int sock);
+
+        static int sendp(int sock, hatred_errno what);
+
+        static inline constexpr int p_size() { return sizeof(hatred_errno); }
     };
 
     struct hatred_echo {
@@ -99,6 +130,10 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_echo& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& message);
+
+        static inline constexpr int p_size(const std::string& message) { return size_string(message); };
     };
 
     struct hatred_exec {
@@ -107,6 +142,10 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_exec& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& cmd, const std::vector<std::string>& args);
+
+        static inline constexpr int p_size(const std::string& cmd, const std::vector<std::string>& args) { return size_string(cmd) + size_vector(args); }
     };
 
     struct hatred_stream {
@@ -115,6 +154,10 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_stream& to);
         int send(int sock);
+
+        static int sendp(int sock, int fd, const std::string& data);
+
+        static inline constexpr int p_size(const std::string& data) { return size_int() + size_string(data); }
     };
 
     struct hatred_finfo {
@@ -124,6 +167,9 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_finfo& to);
         int send(int sock);
+
+        static inline constexpr int p_size(const std::string& name) { return size_int() + size_string(name); }
+        inline constexpr int p_size() const { return p_size(name); }
     };
 
     struct hatred_dir {
@@ -131,13 +177,8 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_dir& to);
         int send(int sock);
-    };
 
-    struct hatred_file {
-        std::string content;
-
-        static int recv(int sock, hatred_file& to);
-        int send(int sock);
+        static inline constexpr int p_size(const std::vector<hatred_finfo>& data) { return size_vector(data); }
     };
 
     struct hatred_getfinfo {
@@ -145,6 +186,10 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_getfinfo& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& data);
+
+        static inline constexpr int p_size(const std::string& name) { return size_string(name); }
     };
 
     struct hatred_getdir {
@@ -152,6 +197,10 @@ namespace hatred::proto {
         
         static int recv(int sock, hatred_getdir& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& data);
+
+        static inline constexpr int p_size(const std::string& name) { return size_string(name); }
     };
 
     struct hatred_mkdir {
@@ -159,6 +208,10 @@ namespace hatred::proto {
         
         static int recv(int sock, hatred_mkdir& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& data);
+        
+        static inline constexpr int p_size(const std::string& name) { return size_string(name); }
     };
 
     struct hatred_rmdir {
@@ -166,6 +219,10 @@ namespace hatred::proto {
         
         static int recv(int sock, hatred_rmdir& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& data);
+        
+        static inline constexpr int p_size(const std::string& name) { return size_string(name); }
     };
 
     struct hatred_getfile {
@@ -173,6 +230,10 @@ namespace hatred::proto {
         
         static int recv(int sock, hatred_getfile& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& data);
+        
+        static inline constexpr int p_size(const std::string& name) { return size_string(name); }
     };
 
     struct hatred_putfile {
@@ -180,6 +241,10 @@ namespace hatred::proto {
 
         static int recv(int sock, hatred_putfile& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& data);
+        
+        static inline constexpr int p_size(const std::string& name) { return size_string(name); }
     };
 
     struct hatred_rmfile {
@@ -187,5 +252,9 @@ namespace hatred::proto {
         
         static int recv(int sock, hatred_rmfile& to);
         int send(int sock);
+
+        static int sendp(int sock, const std::string& data);
+        
+        static inline constexpr int p_size(const std::string& name) { return size_string(name); }
     };
 }

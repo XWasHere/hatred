@@ -196,7 +196,7 @@ namespace hatred::http {
     }
 
     http_url parse_url(const std::string& surl) {
-        http_url url;
+        http_url url = {};
 
         if (surl.length() >= strlen("http://") && surl.substr(0, strlen("http://")) == "http://") {
             int i = strlen("http://");

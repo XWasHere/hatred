@@ -15,19 +15,19 @@ namespace hatred::upnp {
         unsigned int max_wait;
 
         // what to search for (required)
-        char* search_target;
+        const char* search_target;
 
         // user agent
-        char* user_agent;
+        const char* user_agent;
 
         // tcp port to reply to (49152 - 65535)
         unsigned short reply_to;
 
         // fname (required)
-        char* friendly_name;
+        const char* friendly_name;
 
         // uuid i think idk
-        char* uuid;
+        const char* uuid;
     };
 
     //struct msearch_u 
